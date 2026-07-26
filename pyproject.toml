@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "a-share-research"
+version = "0.1.0"
+description = "Reproducible A-share data, factor research and rule-aware backtesting MVP"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Business-Unit-for-Stock" }]
+dependencies = [
+  "pandas>=1.5,<3",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8",
+  "ruff>=0.5",
+]
+data = [
+  "akshare>=1.18",
+  "yfinance>=0.2",
+]
+
+[project.scripts]
+stock-research = "stock_research.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
