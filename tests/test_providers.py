@@ -2,13 +2,17 @@ import unittest
 
 import pandas as pd
 
-from stock_research.providers import normalize_provider_frame, read_symbols, yahoo_ticker
+from stock_research.providers import baostock_code, normalize_provider_frame, read_symbols, yahoo_ticker
 
 
 class ProviderTests(unittest.TestCase):
     def test_yahoo_ticker_mapping(self) -> None:
         self.assertEqual(yahoo_ticker("600519"), "600519.SS")
         self.assertEqual(yahoo_ticker("000001"), "000001.SZ")
+
+    def test_baostock_code_mapping(self) -> None:
+        self.assertEqual(baostock_code("600519"), "sh.600519")
+        self.assertEqual(baostock_code("000001"), "sz.000001")
 
     def test_normalize_akshare_frame(self) -> None:
         frame = pd.DataFrame(
@@ -35,4 +39,3 @@ class ProviderTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

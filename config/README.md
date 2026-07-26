@@ -9,7 +9,7 @@
 
 代码会在进入数据源前统一为 `XXXXXX.XSHG/XSHE/XBSE`。
 
-当前 Workflow 默认使用 AKShare 和 yfinance 的公开日线接口，不需要 Token。只想使用 AKShare 时，可以在手动运行中指定：
+当前 Workflow 默认使用 AKShare、Baostock 和 yfinance 的公开日线接口，不需要 Token。只想使用 AKShare 时，可以在手动运行中指定：
 
 ```text
 --providers akshare

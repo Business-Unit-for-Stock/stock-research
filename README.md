@@ -49,7 +49,7 @@ python -m unittest discover -s tests -v
 
 ## 免费数据
 
-GitHub Actions 中的 `Free market data snapshot` 会在工作日北京时间 18:30 自动运行，也支持手动指定日期、数据源和复权方式。默认同时调用 AKShare 与 yfinance，单个来源失败不会丢失另一个来源的结果。
+GitHub Actions 中的 `Free market data snapshot` 会在工作日北京时间 18:30 自动运行，也支持手动指定日期、数据源和复权方式。默认调用 AKShare、Baostock 与 yfinance，单个来源失败不会丢失其他来源的结果。
 
 数据不会自动提交到 Git 历史，而是作为保留 30 天的 Workflow Artifact 下载。配置和授权边界见 [免费数据获取说明](docs/free-data.md)。
 

@@ -11,7 +11,7 @@ on:
         type: string
       providers:
         required: false
-        default: "akshare,yfinance"
+        default: "akshare,baostock,yfinance"
         type: string
       adjust:
         required: false
@@ -28,9 +28,9 @@ on:
         required: false
         type: string
       providers:
-        description: "数据源，逗号分隔：akshare,yfinance"
+        description: "数据源，逗号分隔：akshare,baostock,yfinance"
         required: false
-        default: "akshare,yfinance"
+        default: "akshare,baostock,yfinance"
         type: string
       adjust:
         description: "AKShare 复权方式：none、qfq 或 hfq"
@@ -53,26 +53,26 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Checkout research code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: Business-Unit-for-Stock/stock-research
           ref: main
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: "3.11"
       - name: Install pinned organization forks
         run: |
           python -m pip install --upgrade pip
           python -m pip install -e .
-          python -m pip install \
+          python -m pip install baostock \
             "git+https://github.com/Business-Unit-for-Stock/akshare.git@main" \
             "git+https://github.com/Business-Unit-for-Stock/yfinance.git@main"
       - name: Fetch free snapshot
         env:
           START_DATE: ${{ inputs.start_date }}
           END_DATE: ${{ inputs.end_date }}
-          PROVIDERS: ${{ inputs.providers || 'akshare,yfinance' }}
+          PROVIDERS: ${{ inputs.providers || 'akshare,baostock,yfinance' }}
           ADJUST: ${{ inputs.adjust || 'none' }}
         run: |
           args=(--symbols config/symbols.txt --providers "$PROVIDERS" --output-dir data/snapshot --per-symbol-timeout 45)
@@ -82,7 +82,7 @@ jobs:
           python scripts/fetch_free_data.py "${args[@]}"
       - name: Upload snapshot artifact
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: free-data-${{ github.run_id }}
           path: data/snapshot

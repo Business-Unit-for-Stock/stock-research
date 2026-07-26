@@ -5,6 +5,7 @@
 Workflow 只安装并调用公开数据接口：
 
 - AKShare：默认主源，A 股日线；
+- Baostock：默认免费备用源，使用独立行情服务；
 - yfinance：默认补充源，主要用于跨市场或接口交叉检查；
 - Tushare：代码已保留在组织 Fork，但 Pro 数据权限依赖 Token 和积分，本 Workflow 不把它作为“零配置免费源”。
 
@@ -16,7 +17,7 @@ Workflow 只安装并调用公开数据接口：
 
 - `start_date`：如 `20250101`；
 - `end_date`：如 `20250726`；
-- `providers`：默认 `akshare,yfinance`，也可以只填写 `akshare`；
+- `providers`：默认 `akshare,baostock,yfinance`，也可以只填写其中一个；
 - `adjust`：`none`、`qfq` 或 `hfq`。
 
 本地运行：
@@ -30,6 +31,7 @@ python scripts/fetch_free_data.py --start-date 20250101 --end-date 20250726
 输出目录为 `data/snapshot/`：
 
 - `akshare_daily.csv`；
+- `baostock_daily.csv`；
 - `yfinance_daily.csv`（启用时）；
 - `manifest.json`，记录时间范围、来源、行数和错误。
 

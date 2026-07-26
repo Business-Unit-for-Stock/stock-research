@@ -14,6 +14,7 @@ from stock_research.providers import (  # noqa: E402
     default_end_date,
     default_start_date,
     fetch_akshare,
+    fetch_baostock,
     fetch_yfinance,
     read_symbols,
     write_manifest,
@@ -25,7 +26,11 @@ def parser() -> argparse.ArgumentParser:
     command.add_argument("--symbols", default="config/symbols.txt")
     command.add_argument("--start-date", default=None, help="YYYYMMDD，默认最近 30 天")
     command.add_argument("--end-date", default=None, help="YYYYMMDD，默认今天")
-    command.add_argument("--providers", default="akshare,yfinance", help="逗号分隔：akshare,yfinance")
+    command.add_argument(
+        "--providers",
+        default="akshare,baostock,yfinance",
+        help="逗号分隔：akshare,baostock,yfinance",
+    )
     command.add_argument("--adjust", default="none", choices=["none", "qfq", "hfq"])
     command.add_argument("--output-dir", default="data/snapshot")
     command.add_argument("--per-symbol-timeout", type=int, default=45)
@@ -48,6 +53,16 @@ def main(argv: list[str] | None = None) -> int:
         if provider == "akshare":
             adjust = "" if args.adjust == "none" else args.adjust
             result = fetch_akshare(
+                symbols,
+                start_date,
+                end_date,
+                args.output_dir,
+                adjust=adjust,
+                timeout_seconds=args.per_symbol_timeout,
+            )
+        elif provider == "baostock":
+            adjust = "" if args.adjust == "none" else args.adjust
+            result = fetch_baostock(
                 symbols,
                 start_date,
                 end_date,

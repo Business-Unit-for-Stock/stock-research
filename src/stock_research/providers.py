@@ -71,6 +71,22 @@ def yahoo_ticker(symbol: str) -> str:
     return f"{code}.{suffix}"
 
 
+def baostock_code(symbol: str) -> str:
+    normalized = normalize_symbol(symbol)
+    code, exchange = normalized.split(".", 1)
+    prefix = {"XSHG": "sh", "XSHE": "sz", "XBSE": "bj"}[exchange]
+    return f"{prefix}.{code}"
+
+
+def akshare_sina_symbol(symbol: str) -> str:
+    normalized = normalize_symbol(symbol)
+    code, exchange = normalized.split(".", 1)
+    if exchange == "XBSE":
+        raise ValueError("AKShare 新浪接口暂不支持北交所代码")
+    prefix = "sh" if exchange == "XSHG" else "sz"
+    return f"{prefix}{code}"
+
+
 def _column_lookup(frame: pd.DataFrame, candidates: Iterable[str]) -> str | None:
     columns = {str(column).strip().lower(): column for column in frame.columns}
     for candidate in candidates:
@@ -136,6 +152,7 @@ def normalize_provider_frame(
 
 
 def _akshare_symbol_worker(
+    normalized_symbol: str,
     code: str,
     start_date: str,
     end_date: str,
@@ -147,15 +164,34 @@ def _akshare_symbol_worker(
     try:
         import akshare as ak
 
-        frame = ak.stock_zh_a_hist(
-            symbol=code,
-            period="daily",
-            start_date=start_date,
-            end_date=end_date,
-            adjust=adjust,
-        )
+        endpoint = "eastmoney"
+        try:
+            frame = ak.stock_zh_a_hist(
+                symbol=code,
+                period="daily",
+                start_date=start_date,
+                end_date=end_date,
+                adjust=adjust,
+            )
+        except Exception as eastmoney_error:
+            endpoint = "sina"
+            try:
+                frame = ak.stock_zh_a_daily(
+                    symbol=akshare_sina_symbol(normalized_symbol),
+                    start_date=start_date,
+                    end_date=end_date,
+                    adjust=adjust,
+                )
+            except Exception as sina_error:
+                raise RuntimeError(
+                    f"eastmoney={type(eastmoney_error).__name__}: {eastmoney_error}; "
+                    f"sina={type(sina_error).__name__}: {sina_error}"
+                ) from sina_error
         frame.to_csv(raw_path, index=False)
-        Path(status_path).write_text(json.dumps({"ok": True, "rows": len(frame)}), encoding="utf-8")
+        Path(status_path).write_text(
+            json.dumps({"ok": True, "rows": len(frame), "endpoint": endpoint}),
+            encoding="utf-8",
+        )
     except BaseException as exc:  # child must report library/network failures to the parent
         Path(status_path).write_text(
             json.dumps({"ok": False, "error": f"{type(exc).__name__}: {exc}"}, ensure_ascii=False),
@@ -192,7 +228,7 @@ def fetch_akshare(
         try:
             process = context.Process(
                 target=_akshare_symbol_worker,
-                args=(code, start_date, end_date, adjust, str(raw_path), str(status_path)),
+                args=(symbol, code, start_date, end_date, adjust, str(raw_path), str(status_path)),
             )
             process.start()
             process.join(timeout_seconds)
@@ -221,6 +257,114 @@ def fetch_akshare(
             status_path.unlink(missing_ok=True)
 
     destination = output / "akshare_daily.csv"
+    combined = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame(columns=CANONICAL_COLUMNS)
+    combined.to_csv(destination, index=False)
+    result.files.append(str(destination))
+    return result
+
+
+def _baostock_symbol_worker(
+    normalized_symbol: str,
+    start_date: str,
+    end_date: str,
+    adjust: str,
+    raw_path: str,
+    status_path: str,
+) -> None:
+    try:
+        import baostock as bs
+
+        login = bs.login()
+        if login.error_code != "0":
+            raise RuntimeError(f"login {login.error_code}: {login.error_msg}")
+        try:
+            adjust_flag = {"": "3", "qfq": "2", "hfq": "1"}[adjust]
+            query = bs.query_history_k_data_plus(
+                baostock_code(normalized_symbol),
+                "date,code,open,high,low,close,preclose,volume,amount,adjustflag,turn,pctChg,isST",
+                start_date=datetime.strptime(start_date, "%Y%m%d").strftime("%Y-%m-%d"),
+                end_date=datetime.strptime(end_date, "%Y%m%d").strftime("%Y-%m-%d"),
+                frequency="d",
+                adjustflag=adjust_flag,
+            )
+            if query.error_code != "0":
+                raise RuntimeError(f"query {query.error_code}: {query.error_msg}")
+            rows: list[list[str]] = []
+            while query.next():
+                rows.append(query.get_row_data())
+            frame = pd.DataFrame(rows, columns=query.fields)
+            frame.to_csv(raw_path, index=False)
+            Path(status_path).write_text(
+                json.dumps({"ok": True, "rows": len(frame)}),
+                encoding="utf-8",
+            )
+        finally:
+            bs.logout()
+    except BaseException as exc:
+        Path(status_path).write_text(
+            json.dumps({"ok": False, "error": f"{type(exc).__name__}: {exc}"}, ensure_ascii=False),
+            encoding="utf-8",
+        )
+
+
+def fetch_baostock(
+    symbols: list[str],
+    start_date: str,
+    end_date: str,
+    output_dir: str | Path,
+    adjust: str = "",
+    timeout_seconds: int = 45,
+) -> ProviderResult:
+    """Fetch daily bars from Baostock's free public service."""
+    try:
+        import baostock  # noqa: F401
+    except ImportError as exc:  # pragma: no cover - exercised in CI environment
+        raise RuntimeError("未安装 Baostock，请先 pip install baostock") from exc
+
+    output = Path(output_dir)
+    output.mkdir(parents=True, exist_ok=True)
+    fetched_at = datetime.now(timezone.utc).isoformat()
+    result = ProviderResult(provider="baostock")
+    frames: list[pd.DataFrame] = []
+    temporary = output / ".tmp"
+    temporary.mkdir(parents=True, exist_ok=True)
+    context = mp.get_context("spawn")
+    for symbol in symbols:
+        code = exchange_code(symbol)
+        raw_path = temporary / f"baostock_{code}.csv"
+        status_path = temporary / f"baostock_{code}.json"
+        try:
+            process = context.Process(
+                target=_baostock_symbol_worker,
+                args=(symbol, start_date, end_date, adjust, str(raw_path), str(status_path)),
+            )
+            process.start()
+            process.join(timeout_seconds)
+            if process.is_alive():
+                process.terminate()
+                process.join(5)
+                if process.is_alive():
+                    process.kill()
+                    process.join()
+                raise TimeoutError(f"超过 {timeout_seconds} 秒")
+            if not status_path.exists():
+                raise RuntimeError(f"子进程退出且未生成状态，exitcode={process.exitcode}")
+            status = json.loads(status_path.read_text(encoding="utf-8"))
+            if not status.get("ok"):
+                raise RuntimeError(status.get("error", "未知 Baostock 错误"))
+            frame = pd.read_csv(raw_path)
+            normalized = normalize_provider_frame(frame, symbol, "baostock", fetched_at, adjust or "none")
+            if not normalized.empty:
+                frames.append(normalized)
+                result.symbols += 1
+                result.rows += len(normalized)
+        except Exception as exc:
+            result.errors.append(f"{symbol}: {type(exc).__name__}: {exc}")
+        finally:
+            raw_path.unlink(missing_ok=True)
+            status_path.unlink(missing_ok=True)
+
+    destination = output / "baostock_daily.csv"
     combined = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame(columns=CANONICAL_COLUMNS)
     combined.to_csv(destination, index=False)
     result.files.append(str(destination))
