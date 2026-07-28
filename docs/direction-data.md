@@ -2,7 +2,8 @@
 
 `Direction data snapshot` 在每个工作日北京时间 18:35 运行，也可由其他 Workflow
 或 Actions 页面手动调用。它不提交行情和方向数据到 Git，而是生成保留 30 天的
-Artifact。
+Artifact，并将最新标准化结果发布到
+[GitHub Pages](https://business-unit-for-stock.github.io/stock-research/)。
 
 ## 复用关系
 
@@ -26,6 +27,14 @@ Artifact。
 | `confirmed_directions.csv` | 至少两个独立来源共同出现的当前候选 |
 | `summary.md` | GitHub Actions 摘要 |
 | `manifest.json` | 参数、Fork SHA、文件 SHA-256、行数、错误和方法约束 |
+
+## GitHub Pages
+
+公开页面展示来源状态、多源一致方向和完整方向分析，支持名称、证据类型、来源及范围
+筛选，并提供标准化 CSV 与运行清单下载。页面每次由 Workflow 重新生成，不将运行结果
+提交到 Git 历史。为避免无边界复制第三方响应，`raw/*.json` 只保留在 30 天 Artifact
+中，不发布到 Pages。若任一运行时来源失败，该次诊断 Artifact 仍会上传，但不会覆盖
+此前已经发布的完整页面。
 
 ## 交叉验证规则
 

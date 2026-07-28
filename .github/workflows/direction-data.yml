@@ -20,6 +20,12 @@ on:
 
 permissions:
   contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: direction-pages
+  cancel-in-progress: false
 
 jobs:
   snapshot:
@@ -74,6 +80,18 @@ jobs:
       - name: Publish run summary
         if: always() && hashFiles('data/direction/summary.md') != ''
         run: cat data/direction/summary.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Configure Pages
+        uses: actions/configure-pages@v6
+      - name: Build public research page
+        run: |
+          python scripts/build_direction_pages.py \
+            --data-dir data/direction \
+            --output-dir build/pages \
+            --require-complete
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: build/pages
       - name: Upload direction artifact
         if: always()
         uses: actions/upload-artifact@v7
@@ -82,3 +100,20 @@ jobs:
           path: data/direction
           if-no-files-found: error
           retention-days: 30
+
+  deploy:
+    needs: snapshot
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
+      - name: Publish Pages URL
+        env:
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          echo "## 公开研究页面" >> "$GITHUB_STEP_SUMMARY"
+          echo "$PAGE_URL" >> "$GITHUB_STEP_SUMMARY"
