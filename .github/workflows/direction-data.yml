@@ -1,0 +1,96 @@
+name: Direction data snapshot
+
+on:
+  workflow_call:
+    inputs:
+      days:
+        required: false
+        default: 20
+        type: number
+      top_n:
+        required: false
+        default: 20
+        type: number
+  workflow_dispatch:
+    inputs:
+      days:
+        description: "板块轮动回溯交易日：10、20、30 或 50"
+        required: false
+        default: "20"
+        type: choice
+        options: ["10", "20", "30", "50"]
+      top_n:
+        description: "每个来源保留的前 N 个方向"
+        required: false
+        default: "20"
+        type: choice
+        options: ["10", "20", "30"]
+  schedule:
+    - cron: "35 10 * * 1-5"
+
+permissions:
+  contents: read
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout research orchestrator
+        uses: actions/checkout@v7
+        with:
+          repository: Business-Unit-for-Stock/stock-research
+          ref: main
+      - name: Checkout organization Forks
+        uses: actions/checkout@v7
+        with:
+          repository: Business-Unit-for-Stock/akshare
+          ref: main
+          path: .external/akshare
+          persist-credentials: false
+      - name: Checkout direction source Fork
+        uses: actions/checkout@v7
+        with:
+          repository: Business-Unit-for-Stock/plate-rotation-skill
+          ref: main
+          path: .external/plate-rotation-skill
+          persist-credentials: false
+      - name: Checkout interface reference Fork
+        uses: actions/checkout@v7
+        with:
+          repository: Business-Unit-for-Stock/a-stock-data
+          ref: main
+          path: .external/a-stock-data
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - name: Install organization modules
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .
+          python -m pip install -e .external/akshare
+      - name: Fetch and normalize direction data
+        env:
+          DAYS: ${{ inputs.days || 20 }}
+          TOP_N: ${{ inputs.top_n || 20 }}
+        run: |
+          python scripts/fetch_direction_data.py \
+            --output-dir data/direction \
+            --plate-repo .external/plate-rotation-skill \
+            --akshare-repo .external/akshare \
+            --a-stock-data-repo .external/a-stock-data \
+            --days "$DAYS" \
+            --top-n "$TOP_N"
+      - name: Publish run summary
+        if: always() && hashFiles('data/direction/summary.md') != ''
+        run: cat data/direction/summary.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload direction artifact
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: direction-data-${{ github.run_id }}
+          path: data/direction
+          if-no-files-found: error
+          retention-days: 30

@@ -6,7 +6,7 @@
 | 组织 Fork | 上游 | 许可证 | 复用职责 | 接入方式与边界 |
 |---|---|---|---|---|
 | [akshare](https://github.com/Business-Unit-for-Stock/akshare) | [akfamily/akshare](https://github.com/akfamily/akshare) | MIT | A 股免费行情主适配器 | Workflow 安装组织 Fork；输出统一标准化 |
-| [a-stock-data](https://github.com/Business-Unit-for-Stock/a-stock-data) | [simonlin1212/a-stock-data](https://github.com/simonlin1212/a-stock-data) | Apache-2.0 | 行业排名、板块资金流、热点、龙虎榜等免费接口 | 按端点调用并拆成可测试适配器；iwencai 不进入零 Key 流程 |
+| [a-stock-data](https://github.com/Business-Unit-for-Stock/a-stock-data) | [simonlin1212/a-stock-data](https://github.com/simonlin1212/a-stock-data) | Apache-2.0 | 行业排名、板块资金流、热点、龙虎榜等免费接口方法 | 当前是 `SKILL.md` 而非可导入包；Workflow 固定其 SHA 并使用 AKShare 的结构化运行时适配器；iwencai 不进入零 Key 流程 |
 | [plate-rotation-skill](https://github.com/Business-Unit-for-Stock/plate-rotation-skill) | [hssqz/plate-rotation-skill](https://github.com/hssqz/plate-rotation-skill) | MIT | 短线板块排名、轮动曲线和龙头持续性 | 调用 CLI/API 保存原始 JSON；第三方聚合接口不得作为唯一真值 |
 | [tickflow-stock-panel](https://github.com/Business-Unit-for-Stock/tickflow-stock-panel) | [shy3130/tickflow-stock-panel](https://github.com/shy3130/tickflow-stock-panel) | MIT | 概念轮动、市场状态和 walk-forward 回测参考 | 复用独立算法与测试方法；不绑定其完整 UI/数据库/付费数据服务 |
 | [stock-screener](https://github.com/Business-Unit-for-Stock/stock-screener) | [xang1234/stock-screener](https://github.com/xang1234/stock-screener) | Apache-2.0 | 多周期相对强度、行业排名、RRG 和市场状态 | 提取确定性计算模块；不引入完整 PostgreSQL/Redis/前端系统 |
