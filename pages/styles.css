@@ -171,9 +171,14 @@ main {
 
 .health-badge.is-good,
 .status-pill.is-good,
-.evidence-pill.is-cross {
+.evidence-pill.is-strong {
   color: var(--good);
   background: var(--good-soft);
+}
+
+.evidence-pill.is-coverage {
+  color: var(--accent);
+  background: var(--accent-soft);
 }
 
 .health-badge.is-warn,
@@ -187,14 +192,15 @@ main {
   background: var(--bad-soft);
 }
 
-.evidence-pill.is-single {
+.evidence-pill.is-single,
+.evidence-pill.is-single-strong {
   color: var(--muted);
   background: var(--surface-muted);
 }
 
 .metrics {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   border-top: 1px solid var(--line);
 }
 
@@ -477,16 +483,16 @@ footer {
     border-bottom: 1px solid var(--line);
   }
 
-  .metric:nth-child(2) {
+  .metric:nth-child(even) {
     border-right: 0;
   }
 
-  .metric:nth-last-child(-n + 2) {
-    border-bottom: 0;
+  .metric:nth-child(odd) {
+    padding-left: 0;
   }
 
-  .metric:nth-child(3) {
-    padding-left: 0;
+  .metric:last-child {
+    border-bottom: 0;
   }
 
   .metric strong {

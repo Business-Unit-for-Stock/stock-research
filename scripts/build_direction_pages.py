@@ -13,7 +13,8 @@ TEMPLATE_DIR = PROJECT_ROOT / "pages"
 PUBLIC_DATA_FILES = (
     "direction_analysis.csv",
     "direction_evidence.csv",
-    "confirmed_directions.csv",
+    "multi_source_strong.csv",
+    "multi_source_coverage.csv",
     "manifest.json",
     "summary.md",
 )
@@ -23,8 +24,8 @@ REQUIRED_RUNTIME_SOURCES = (
     "akshare_industry",
     "akshare_concept",
 )
-INTEGER_FIELDS = {"evidence_count", "best_rank", "plate_appearance_days"}
-FLOAT_FIELDS = {"consensus_rank_score", "plate_persistence_ratio"}
+INTEGER_FIELDS = {"evidence_count", "strong_source_count", "plate_appearance_days"}
+FLOAT_FIELDS = {"plate_persistence_ratio"}
 
 
 def parser() -> argparse.ArgumentParser:
@@ -79,17 +80,20 @@ def build_pages(
                 "Refusing to replace the public page with incomplete data: " + ", ".join(failed)
             )
     analysis = read_csv(data_dir / "direction_analysis.csv")
-    confirmed = read_csv(data_dir / "confirmed_directions.csv")
+    strong = read_csv(data_dir / "multi_source_strong.csv")
+    coverage = read_csv(data_dir / "multi_source_coverage.csv")
     payload = {
-        "schema_version": 1,
+        "schema_version": 2,
         "generated_at": manifest.get("generated_at"),
         "as_of_date": manifest.get("as_of_date"),
         "as_of_date_quality": manifest.get("as_of_date_quality"),
         "parameters": manifest.get("parameters", {}),
         "records": manifest.get("records", {}),
         "source_status": manifest.get("source_status", {}),
+        "method_references": manifest.get("method_references", {}),
         "fork_commits": manifest.get("fork_commits", {}),
-        "confirmed": confirmed,
+        "strong": strong,
+        "coverage": coverage,
         "analysis": analysis,
     }
 
@@ -117,7 +121,8 @@ def main(argv: list[str] | None = None) -> int:
     )
     print(
         f"pages evidence={payload['records'].get('direction_evidence', 0)} "
-        f"analysis={len(payload['analysis'])} confirmed={len(payload['confirmed'])}"
+        f"analysis={len(payload['analysis'])} strong={len(payload['strong'])} "
+        f"coverage={len(payload['coverage'])}"
     )
     return 0
 

@@ -21,7 +21,8 @@ DIRECTION_COLUMNS = [
     "canonical_name",
     "rank",
     "list_size",
-    "rank_score",
+    "is_strong",
+    "strength_rule",
     "metric",
     "metric_value",
     "metric_unit",
@@ -38,14 +39,15 @@ ANALYSIS_COLUMNS = [
     "as_of_date",
     "name",
     "canonical_name",
-    "evidence_level",
+    "coverage_level",
+    "strength_level",
     "lifecycle",
     "evidence_count",
+    "strong_source_count",
     "source_families",
+    "strong_source_families",
     "providers",
     "universes",
-    "best_rank",
-    "consensus_rank_score",
     "plate_persistence_ratio",
     "plate_appearance_days",
     "quality_notes",
@@ -91,19 +93,24 @@ def _first(record: dict[str, Any], *keys: str, default: Any = None) -> Any:
     return default
 
 
-def _rank_score(rank: int, list_size: int) -> float:
-    if rank <= 0 or list_size <= 0:
-        return 0.0
-    return round(max(0.0, min(1.0, (list_size - rank + 1) / list_size)), 6)
-
-
 def _finalize_ranks(rows: list[dict[str, Any]]) -> None:
     if not rows:
         return
     list_size = max(len(rows), max(int(row["rank"]) for row in rows))
     for row in rows:
         row["list_size"] = list_size
-        row["rank_score"] = _rank_score(int(row["rank"]), list_size)
+        if row["source_family"] in {"ths", "kaipan"}:
+            row["is_strong"] = True
+            row["strength_rule"] = "upstream_selected_current_list"
+        else:
+            top_twenty_percent = max(1, math.ceil(list_size * 0.2))
+            change_pct = _number(row.get("metric_value"))
+            row["is_strong"] = bool(
+                int(row["rank"]) <= top_twenty_percent
+                and change_pct is not None
+                and change_pct > 0
+            )
+            row["strength_rule"] = "top_20pct_and_positive_change"
 
 
 def normalize_akshare_boards(
@@ -212,7 +219,7 @@ def build_direction_analysis(
     *,
     as_of_date: str | None = None,
 ) -> pd.DataFrame:
-    """Build rank-based evidence without comparing heterogeneous raw metrics."""
+    """Separate cross-source name coverage from source-specific strength."""
     if frame.empty:
         return pd.DataFrame(columns=ANALYSIS_COLUMNS)
     target_date = as_of_date or str(frame["as_of_date"].max())
@@ -222,7 +229,10 @@ def build_direction_analysis(
 
     # A source family contributes at most one vote, even when one provider emits
     # both industry and concept rows with the same normalized name.
-    current = current_all.sort_values(["canonical_name", "source_family", "rank"])
+    current = current_all.sort_values(
+        ["canonical_name", "source_family", "is_strong", "rank"],
+        ascending=[True, True, False, True],
+    )
     current = current.drop_duplicates(["canonical_name", "source_family"], keep="first")
 
     plate = frame[frame["source_family"].isin(["ths", "kaipan"])].copy()
@@ -237,6 +247,10 @@ def build_direction_analysis(
         all_group = current_all[current_all["canonical_name"] == canonical_name]
         names = [str(value) for value in all_group["name"].dropna().unique()]
         families = sorted(str(value) for value in group["source_family"].unique())
+        strong_families = sorted(
+            str(value)
+            for value in group.loc[group["is_strong"].astype(bool), "source_family"].unique()
+        )
         providers = sorted(str(value) for value in group["provider"].unique())
         universes = sorted(str(value) for value in all_group["universe"].unique())
 
@@ -252,6 +266,7 @@ def build_direction_analysis(
         persistence = max(ratios, default=0.0)
 
         evidence_count = len(families)
+        strong_source_count = len(strong_families)
         if evidence_count >= 2 and persistence >= 0.5:
             lifecycle = "multi_source_persistent"
         elif evidence_count >= 2:
@@ -278,6 +293,9 @@ def build_direction_analysis(
                     "universe": row.universe,
                     "name": row.name,
                     "rank": int(row.rank),
+                    "list_size": int(row.list_size),
+                    "strong": bool(row.is_strong),
+                    "strength_rule": row.strength_rule,
                     "metric": row.metric,
                     "value": None if pd.isna(row.metric_value) else float(row.metric_value),
                     "unit": row.metric_unit,
@@ -289,14 +307,23 @@ def build_direction_analysis(
                 "as_of_date": target_date,
                 "name": names[0] if names else canonical_name,
                 "canonical_name": canonical_name,
-                "evidence_level": "cross_source" if evidence_count >= 2 else "single_source",
+                "coverage_level": (
+                    "multi_source_coverage" if evidence_count >= 2 else "single_source"
+                ),
+                "strength_level": (
+                    "multi_source_strong"
+                    if strong_source_count >= 2
+                    else "single_source_strong"
+                    if strong_source_count == 1
+                    else "no_strong_source"
+                ),
                 "lifecycle": lifecycle,
                 "evidence_count": evidence_count,
+                "strong_source_count": strong_source_count,
                 "source_families": ",".join(families),
+                "strong_source_families": ",".join(strong_families),
                 "providers": ",".join(providers),
                 "universes": ",".join(universes),
-                "best_rank": int(group["rank"].min()),
-                "consensus_rank_score": round(float(group["rank_score"].mean()), 6),
                 "plate_persistence_ratio": round(persistence, 6),
                 "plate_appearance_days": appearance_slots,
                 "quality_notes": ",".join(notes),
@@ -305,7 +332,11 @@ def build_direction_analysis(
         )
 
     result = pd.DataFrame(output, columns=ANALYSIS_COLUMNS)
+    priority = pd.Series(0, index=result.index)
+    priority.loc[result["coverage_level"] == "multi_source_coverage"] = 1
+    priority.loc[result["strength_level"] == "multi_source_strong"] = 2
+    result = result.assign(_priority=priority)
     return result.sort_values(
-        ["evidence_count", "consensus_rank_score", "best_rank"],
-        ascending=[False, False, True],
-    ).reset_index(drop=True)
+        ["_priority", "strong_source_count", "evidence_count", "name"],
+        ascending=[False, False, False, True],
+    ).drop(columns="_priority").reset_index(drop=True)

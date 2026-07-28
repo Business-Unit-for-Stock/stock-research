@@ -11,14 +11,15 @@ ANALYSIS_FIELDS = [
     "as_of_date",
     "name",
     "canonical_name",
-    "evidence_level",
+    "coverage_level",
+    "strength_level",
     "lifecycle",
     "evidence_count",
+    "strong_source_count",
     "source_families",
+    "strong_source_families",
     "providers",
     "universes",
-    "best_rank",
-    "consensus_rank_score",
     "plate_persistence_ratio",
     "plate_appearance_days",
     "quality_notes",
@@ -38,20 +39,25 @@ class PagesTests(unittest.TestCase):
                 "as_of_date": "2026-07-27",
                 "name": "脑机接口",
                 "canonical_name": "脑机接口",
-                "evidence_level": "cross_source",
+                "coverage_level": "multi_source_coverage",
+                "strength_level": "multi_source_strong",
                 "lifecycle": "multi_source_current",
                 "evidence_count": 2,
+                "strong_source_count": 2,
                 "source_families": "kaipan,ths",
+                "strong_source_families": "kaipan,ths",
                 "providers": "plate-rotation-skill",
                 "universes": "plate",
-                "best_rank": 1,
-                "consensus_rank_score": 0.8,
                 "plate_persistence_ratio": 0.0,
                 "plate_appearance_days": 2,
                 "quality_notes": "",
                 "evidence_json": "[]",
             }
-            for name in ("direction_analysis.csv", "confirmed_directions.csv"):
+            for name in (
+                "direction_analysis.csv",
+                "multi_source_strong.csv",
+                "multi_source_coverage.csv",
+            ):
                 with (data_dir / name).open("w", encoding="utf-8", newline="") as handle:
                     writer = csv.DictWriter(handle, fieldnames=ANALYSIS_FIELDS)
                     writer.writeheader()
@@ -66,14 +72,23 @@ class PagesTests(unittest.TestCase):
                         "generated_at": "2026-07-28T10:00:00+08:00",
                         "as_of_date": "2026-07-27",
                         "as_of_date_quality": "source_reported",
-                        "parameters": {"scope": "complete_current_lists"},
+                        "parameters": {"scope": "complete_provider_responses"},
                         "records": {
                             "direction_evidence": 1,
                             "direction_analysis": 1,
-                            "confirmed_directions": 1,
+                            "multi_source_strong": 1,
+                            "multi_source_coverage": 1,
                         },
                         "source_status": {
                             "plate_rotation_ths": {"ok": True, "rows": 1}
+                        },
+                        "method_references": {
+                            "a_stock_data": {
+                                "available": True,
+                                "purpose": "44 项接口方法目录",
+                                "runtime_requests": False,
+                                "commit": "def456",
+                            }
                         },
                         "fork_commits": {"stock_research": "abc123"},
                     },
@@ -111,6 +126,8 @@ class PagesTests(unittest.TestCase):
             self.assertEqual(dashboard["records"]["direction_evidence"], 1)
             self.assertEqual(dashboard["analysis"][0]["name"], "脑机接口")
             self.assertEqual(dashboard["analysis"][0]["evidence_count"], 2)
+            self.assertEqual(dashboard["strong"][0]["strong_source_count"], 2)
+            self.assertFalse(dashboard["method_references"]["a_stock_data"]["runtime_requests"])
 
             failed = subprocess.run(
                 [

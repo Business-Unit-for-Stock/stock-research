@@ -2,12 +2,16 @@
 
 const PAGE_SIZE = 50;
 const SOURCE_LABELS = {
-  a_stock_data_reference: "a-stock-data 接口参考",
   plate_rotation_ths: "同花顺板块榜",
   plate_rotation_kaipan: "开盘啦强度榜",
-  akshare_industry: "东财行业",
-  akshare_concept: "东财概念",
+  akshare_industry: "东方财富行业",
+  akshare_concept: "东方财富概念",
 };
+const SOURCE_SCOPE_LABELS = {
+  upstream_selected_current_list: "上游精选 Top10",
+  complete_returned_list: "接口返回全表",
+};
+const METHOD_LABELS = { a_stock_data: "a-stock-data" };
 const FAMILY_LABELS = { eastmoney: "东方财富", ths: "同花顺", kaipan: "开盘啦" };
 const UNIVERSE_LABELS = { industry: "行业", concept: "概念", plate: "板块" };
 const LIFECYCLE_LABELS = {
@@ -17,7 +21,6 @@ const LIFECYCLE_LABELS = {
   single_source_persistent: "单源持续",
 };
 const COMMIT_KEYS = {
-  a_stock_data_reference: "a_stock_data",
   plate_rotation_ths: "plate_rotation_skill",
   plate_rotation_kaipan: "plate_rotation_skill",
   akshare_industry: "akshare",
@@ -45,16 +48,12 @@ function splitValues(value) {
 }
 
 function sourceText(value) {
-  return splitValues(value).map((item) => FAMILY_LABELS[item] || item).join(" / ");
+  const values = splitValues(value);
+  return values.length ? values.map((item) => FAMILY_LABELS[item] || item).join(" / ") : "-";
 }
 
 function universeText(value) {
   return splitValues(value).map((item) => UNIVERSE_LABELS[item] || item).join(" / ");
-}
-
-function scoreText(value) {
-  const number = Number(value);
-  return Number.isFinite(number) ? `${(number * 100).toFixed(1)}%` : "-";
 }
 
 function createPill(label, className) {
@@ -64,18 +63,32 @@ function createPill(label, className) {
   return pill;
 }
 
+function classification(record) {
+  if (record.strength_level === "multi_source_strong") {
+    return [`多源强势 ${record.strong_source_count}`, "is-strong"];
+  }
+  if (record.coverage_level === "multi_source_coverage") {
+    return [`多源覆盖 ${record.evidence_count}`, "is-coverage"];
+  }
+  if (record.strength_level === "single_source_strong") {
+    return ["单源强势", "is-single-strong"];
+  }
+  return ["单一来源", "is-single"];
+}
+
 function renderHeader(data) {
   const generated = data.generated_at ? new Date(data.generated_at).toLocaleString("zh-CN") : "未知";
   byId("run-meta").textContent = `数据日期 ${data.as_of_date || "-"} · 更新于 ${generated}`;
   byId("metric-evidence").textContent = Number(data.records.direction_evidence || 0).toLocaleString("zh-CN");
   byId("metric-analysis").textContent = Number(data.records.direction_analysis || 0).toLocaleString("zh-CN");
-  byId("metric-confirmed").textContent = Number(data.records.confirmed_directions || 0).toLocaleString("zh-CN");
+  byId("metric-strong").textContent = Number(data.records.multi_source_strong || 0).toLocaleString("zh-CN");
+  byId("metric-coverage").textContent = Number(data.records.multi_source_coverage || 0).toLocaleString("zh-CN");
 
-  const runtimeSources = Object.entries(data.source_status).filter(([key]) => key !== "a_stock_data_reference");
+  const runtimeSources = Object.entries(data.source_status);
   const successful = runtimeSources.filter(([, status]) => status.ok).length;
   byId("metric-sources").textContent = `${successful}/${runtimeSources.length}`;
-  byId("scope-label").textContent = data.parameters.scope === "complete_current_lists"
-    ? "完整当前榜单"
+  byId("scope-label").textContent = data.parameters.scope === "complete_provider_responses"
+    ? "接口完整响应（本地未截断）"
     : String(data.parameters.scope || "未标注范围");
 
   const failed = runtimeSources.filter(([, status]) => !status.ok);
@@ -111,6 +124,7 @@ function renderSources(data) {
     statusCell.append(createPill(status.ok ? "正常" : "异常", `status-pill ${status.ok ? "is-good" : "is-bad"}`));
     row.append(statusCell);
     row.append(textCell(status.rows == null ? "-" : Number(status.rows).toLocaleString("zh-CN"), "number-cell"));
+    row.append(textCell(SOURCE_SCOPE_LABELS[status.scope] || status.scope || "-"));
     row.append(textCell(status.attempts == null ? "-" : status.attempts, "number-cell"));
     const commitKey = COMMIT_KEYS[key];
     const commit = status.commit || (commitKey ? data.fork_commits[commitKey] : "");
@@ -138,38 +152,58 @@ function renderSources(data) {
   }
 }
 
-function appendDirectionRow(body, record, index, includeIndex) {
-  const row = document.createElement("tr");
-  if (includeIndex) row.append(textCell(index, "number-cell muted-cell"));
-  row.append(textCell(record.name || record.canonical_name, "direction-name"));
-
-  if (includeIndex) {
-    const evidenceCell = document.createElement("td");
-    const isCross = record.evidence_level === "cross_source";
-    evidenceCell.append(createPill(isCross ? `多源 ${record.evidence_count}` : "单源", `evidence-pill ${isCross ? "is-cross" : "is-single"}`));
-    row.append(evidenceCell);
-  }
-  row.append(textCell(sourceText(record.source_families)));
-  row.append(textCell(universeText(record.universes)));
-  row.append(textCell(record.best_rank, "number-cell"));
-  row.append(textCell(scoreText(record.consensus_rank_score), "number-cell"));
-  row.append(textCell(LIFECYCLE_LABELS[record.lifecycle] || record.lifecycle || "-"));
-  if (includeIndex) row.append(textCell(record.quality_notes || "-", "muted-cell"));
-  body.append(row);
-}
-
-function renderConfirmed(data) {
-  const body = byId("confirmed-body");
+function renderMethodReferences(data) {
+  const body = byId("reference-body");
   body.replaceChildren();
-  if (!data.confirmed.length) {
+  const entries = Object.entries(data.method_references || {});
+  if (!entries.length) {
     const row = document.createElement("tr");
-    const cell = textCell("当前没有多源一致方向", "empty-row");
-    cell.colSpan = 6;
+    const cell = textCell("没有方法参考记录", "empty-row");
+    cell.colSpan = 5;
     row.append(cell);
     body.append(row);
     return;
   }
-  data.confirmed.forEach((record) => appendDirectionRow(body, record, 0, false));
+  for (const [key, reference] of entries) {
+    const row = document.createElement("tr");
+    row.append(textCell(METHOD_LABELS[key] || key, "direction-name"));
+    row.append(textCell(reference.purpose || reference.note || "-"));
+    row.append(textCell(reference.runtime_requests ? "是" : "否"));
+    const statusCell = document.createElement("td");
+    statusCell.append(createPill(reference.available ? "已固定版本" : "不可用", `status-pill ${reference.available ? "is-good" : "is-bad"}`));
+    row.append(statusCell);
+    row.append(textCell(reference.commit ? String(reference.commit).slice(0, 8) : "-", "muted-cell"));
+    body.append(row);
+  }
+}
+
+function appendFeaturedRow(body, record, strongFirst) {
+  const row = document.createElement("tr");
+  row.append(textCell(record.name || record.canonical_name, "direction-name"));
+  if (strongFirst) {
+    row.append(textCell(sourceText(record.strong_source_families)));
+    row.append(textCell(sourceText(record.source_families)));
+  } else {
+    row.append(textCell(sourceText(record.source_families)));
+    row.append(textCell(sourceText(record.strong_source_families)));
+  }
+  row.append(textCell(universeText(record.universes)));
+  row.append(textCell(LIFECYCLE_LABELS[record.lifecycle] || record.lifecycle || "-"));
+  body.append(row);
+}
+
+function renderFeatured(bodyId, records, emptyText, strongFirst) {
+  const body = byId(bodyId);
+  body.replaceChildren();
+  if (!records.length) {
+    const row = document.createElement("tr");
+    const cell = textCell(emptyText, "empty-row");
+    cell.colSpan = 5;
+    row.append(cell);
+    body.append(row);
+    return;
+  }
+  records.forEach((record) => appendFeaturedRow(body, record, strongFirst));
 }
 
 function fillFilter(id, values, labels) {
@@ -192,7 +226,7 @@ function setupFilters(data) {
   fillFilter("source-filter", sources, FAMILY_LABELS);
   fillFilter("universe-filter", universes, UNIVERSE_LABELS);
 
-  ["search-input", "evidence-filter", "source-filter", "universe-filter", "sort-select"].forEach((id) => {
+  ["search-input", "classification-filter", "source-filter", "universe-filter", "sort-select"].forEach((id) => {
     const eventName = id === "search-input" ? "input" : "change";
     byId(id).addEventListener(eventName, () => {
       state.page = 1;
@@ -213,9 +247,22 @@ function setupFilters(data) {
   });
 }
 
+function matchesClassification(record, value) {
+  if (value === "multi_source_strong") return record.strength_level === value;
+  if (value === "multi_source_coverage") return record.coverage_level === value;
+  if (value === "single_source") return record.coverage_level === value;
+  return true;
+}
+
+function priority(record) {
+  if (record.strength_level === "multi_source_strong") return 2;
+  if (record.coverage_level === "multi_source_coverage") return 1;
+  return 0;
+}
+
 function applyFilters() {
   const query = byId("search-input").value.trim().toLocaleLowerCase("zh-CN");
-  const evidence = byId("evidence-filter").value;
+  const classificationValue = byId("classification-filter").value;
   const source = byId("source-filter").value;
   const universe = byId("universe-filter").value;
   const sort = byId("sort-select").value;
@@ -223,23 +270,42 @@ function applyFilters() {
   state.filtered = state.data.analysis.filter((record) => {
     const searchable = `${record.name} ${record.canonical_name} ${record.source_families} ${record.universes}`.toLocaleLowerCase("zh-CN");
     return (!query || searchable.includes(query))
-      && (evidence === "all" || record.evidence_level === evidence)
+      && matchesClassification(record, classificationValue)
       && (source === "all" || splitValues(record.source_families).includes(source))
       && (universe === "all" || splitValues(record.universes).includes(universe));
   });
 
-  if (sort === "score") {
-    state.filtered.sort((a, b) => b.consensus_rank_score - a.consensus_rank_score);
-  } else if (sort === "rank") {
-    state.filtered.sort((a, b) => a.best_rank - b.best_rank);
+  if (sort === "strong") {
+    state.filtered.sort((a, b) => b.strong_source_count - a.strong_source_count
+      || b.evidence_count - a.evidence_count);
+  } else if (sort === "coverage") {
+    state.filtered.sort((a, b) => b.evidence_count - a.evidence_count
+      || b.strong_source_count - a.strong_source_count);
   } else if (sort === "name") {
     state.filtered.sort((a, b) => String(a.name).localeCompare(String(b.name), "zh-CN"));
   } else {
-    state.filtered.sort((a, b) => b.evidence_count - a.evidence_count
-      || b.consensus_rank_score - a.consensus_rank_score
-      || a.best_rank - b.best_rank);
+    state.filtered.sort((a, b) => priority(b) - priority(a)
+      || b.strong_source_count - a.strong_source_count
+      || b.evidence_count - a.evidence_count
+      || String(a.name).localeCompare(String(b.name), "zh-CN"));
   }
   renderAnalysis();
+}
+
+function appendAnalysisRow(body, record, index) {
+  const row = document.createElement("tr");
+  row.append(textCell(index, "number-cell muted-cell"));
+  row.append(textCell(record.name || record.canonical_name, "direction-name"));
+  const classificationCell = document.createElement("td");
+  const [label, className] = classification(record);
+  classificationCell.append(createPill(label, `evidence-pill ${className}`));
+  row.append(classificationCell);
+  row.append(textCell(sourceText(record.source_families)));
+  row.append(textCell(sourceText(record.strong_source_families)));
+  row.append(textCell(universeText(record.universes)));
+  row.append(textCell(LIFECYCLE_LABELS[record.lifecycle] || record.lifecycle || "-"));
+  row.append(textCell(record.quality_notes || "-", "muted-cell"));
+  body.append(row);
 }
 
 function renderAnalysis() {
@@ -253,11 +319,11 @@ function renderAnalysis() {
   if (!pageRows.length) {
     const row = document.createElement("tr");
     const cell = textCell("没有符合条件的方向", "empty-row");
-    cell.colSpan = 9;
+    cell.colSpan = 8;
     row.append(cell);
     body.append(row);
   } else {
-    pageRows.forEach((record, offset) => appendDirectionRow(body, record, start + offset + 1, true));
+    pageRows.forEach((record, offset) => appendAnalysisRow(body, record, start + offset + 1));
   }
   byId("result-count").textContent = `${state.filtered.length.toLocaleString("zh-CN")} 个方向`;
   byId("page-label").textContent = `${state.page} / ${totalPages}`;
@@ -272,7 +338,9 @@ async function start() {
     state.data = await response.json();
     renderHeader(state.data);
     renderSources(state.data);
-    renderConfirmed(state.data);
+    renderMethodReferences(state.data);
+    renderFeatured("strong-body", state.data.strong, "当前没有多源强势方向", true);
+    renderFeatured("coverage-body", state.data.coverage, "当前没有多源覆盖方向", false);
     setupFilters(state.data);
     applyFilters();
   } catch (error) {

@@ -146,16 +146,20 @@ def write_summary(
     path: Path,
     analysis: pd.DataFrame,
     source_status: dict[str, dict],
+    method_references: dict[str, dict],
     *,
     evidence_rows: int,
 ) -> None:
-    confirmed = analysis[analysis["evidence_level"] == "cross_source"].head(10)
+    strong = analysis[analysis["strength_level"] == "multi_source_strong"]
+    coverage = analysis[analysis["coverage_level"] == "multi_source_coverage"]
     lines = [
         "# 方向数据运行摘要",
         "",
         f"- 完整方向证据：{evidence_rows}",
         f"- 聚合方向候选：{len(analysis)}",
-        "- 当前榜单范围：完整（无 Top-N 截断）",
+        f"- 多源强势：{len(strong)}",
+        f"- 多源覆盖：{len(coverage)}",
+        "- 当前处理范围：各接口完整响应（本地无 Top-N 截断）",
         "",
     ]
     lines.append("## 数据源状态")
@@ -163,20 +167,35 @@ def write_summary(
         state = "ok" if status.get("ok") else "failed"
         detail = status.get("error") or status.get("note") or f"rows={status.get('rows', 0)}"
         lines.append(f"- `{name}`: {state}; {detail}")
-    lines.extend(["", "## 多源一致性候选"])
-    if confirmed.empty:
-        lines.append("- 当前没有至少两个独立来源共同出现的候选。")
+    lines.extend(["", "## 方法参考"])
+    for name, reference in method_references.items():
+        lines.append(
+            f"- `{name}`: {reference['purpose']}; "
+            f"运行时请求={'是' if reference['runtime_requests'] else '否'}"
+        )
+    lines.extend(["", "## 多源强势"])
+    if strong.empty:
+        lines.append("- 当前没有至少两个独立来源同时满足各自强势规则的方向。")
     else:
-        for row in confirmed.itertuples(index=False):
+        for row in strong.itertuples(index=False):
             lines.append(
-                f"- {row.name}: 来源={row.source_families}; 最佳排名={row.best_rank}; "
-                f"生命周期={row.lifecycle}"
+                f"- {row.name}: 强势来源={row.strong_source_families}; "
+                f"覆盖来源={row.source_families}"
+            )
+    lines.extend(["", "## 多源覆盖（包含多源强势）"])
+    if coverage.empty:
+        lines.append("- 当前没有至少两个独立来源共同出现的方向。")
+    else:
+        for row in coverage.itertuples(index=False):
+            lines.append(
+                f"- {row.name}: 覆盖来源={row.source_families}; "
+                f"强势来源={row.strong_source_families or '-'}"
             )
     lines.extend(
         [
             "",
-            "板块涨幅、强度分及资金相关数据均保留原始量纲；本摘要只比较各来源榜单位置，"
-            "不构成投资建议。",
+            "强势按来源独立判定：同花顺/开盘啦当前精选榜的返回项视为强势；东方财富仅将"
+            "榜单前 20% 且涨幅为正的方向视为强势。原始量纲不混合计算，不构成投资建议。",
         ]
     )
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -201,12 +220,15 @@ def main(argv: list[str] | None = None) -> int:
         "a_stock_data": git_sha(a_stock_data_repo),
         "stock_research": git_sha(PROJECT_ROOT),
     }
-    source_status: dict[str, dict] = {
-        "a_stock_data_reference": {
-            "ok": bool(commits["a_stock_data"]),
-            "mode": "pinned_interface_reference",
+    source_status: dict[str, dict] = {}
+    method_references = {
+        "a_stock_data": {
+            "available": bool(commits["a_stock_data"]),
+            "mode": "pinned_method_catalog",
             "commit": commits["a_stock_data"],
-            "note": "SKILL.md is not an importable runtime package; AKShare is the structured runtime adapter.",
+            "purpose": "SKILL.md 中的 44 项 A 股数据接口方法目录",
+            "runtime_requests": False,
+            "note": "不是可导入运行包；Workflow 仅固定版本，实际板块请求由 AKShare 执行。",
         }
     }
     frames: list[pd.DataFrame] = []
@@ -215,7 +237,9 @@ def main(argv: list[str] | None = None) -> int:
         parsers = load_plate_parsers(plate_repo)
     except Exception as exc:  # noqa: BLE001
         parsers = None
-        source_status["plate_rotation_parser"] = {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
+        error = f"{type(exc).__name__}: {exc}"
+        source_status["plate_rotation_ths"] = {"ok": False, "error": error}
+        source_status["plate_rotation_kaipan"] = {"ok": False, "error": error}
 
     if parsers is not None:
         for source in ("ths", "kaipan"):
@@ -242,7 +266,12 @@ def main(argv: list[str] | None = None) -> int:
                 if frame.empty:
                     raise RuntimeError("解析后没有板块记录")
                 frames.append(frame)
-                source_status[status_key] = {"ok": True, "rows": len(frame), "raw_file": raw_path.name}
+                source_status[status_key] = {
+                    "ok": True,
+                    "rows": len(frame),
+                    "scope": "upstream_selected_current_list",
+                    "raw_file": raw_path.name,
+                }
             except Exception as exc:  # noqa: BLE001
                 source_status[status_key] = {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
 
@@ -251,12 +280,21 @@ def main(argv: list[str] | None = None) -> int:
     date_quality = "aligned_to_plate" if not plate_frame.empty else "retrieval_date"
 
     if args.skip_akshare:
-        source_status["akshare"] = {"ok": False, "skipped": True, "note": "skipped by command argument"}
+        for universe in ("industry", "concept"):
+            source_status[f"akshare_{universe}"] = {
+                "ok": False,
+                "skipped": True,
+                "note": "skipped by command argument",
+            }
     else:
         try:
             import akshare as ak
         except ImportError as exc:
-            source_status["akshare"] = {"ok": False, "error": f"ImportError: {exc}"}
+            for universe in ("industry", "concept"):
+                source_status[f"akshare_{universe}"] = {
+                    "ok": False,
+                    "error": f"ImportError: {exc}",
+                }
             ak = None
         if ak is not None:
             for universe, loader in (
@@ -289,6 +327,7 @@ def main(argv: list[str] | None = None) -> int:
                         "ok": True,
                         "rows": len(frame),
                         "attempts": attempts,
+                        "scope": "complete_returned_list",
                         "raw_file": raw_path.name,
                     }
                 except Exception as exc:  # noqa: BLE001
@@ -296,17 +335,23 @@ def main(argv: list[str] | None = None) -> int:
 
     evidence = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame(columns=DIRECTION_COLUMNS)
     analysis = build_direction_analysis(evidence, as_of_date=as_of_date)
-    confirmed = analysis[analysis["evidence_level"] == "cross_source"].copy()
+    multi_source_strong = analysis[analysis["strength_level"] == "multi_source_strong"].copy()
+    multi_source_coverage = analysis[
+        analysis["coverage_level"] == "multi_source_coverage"
+    ].copy()
     evidence_path = output_dir / "direction_evidence.csv"
     analysis_path = output_dir / "direction_analysis.csv"
-    confirmed_path = output_dir / "confirmed_directions.csv"
+    strong_path = output_dir / "multi_source_strong.csv"
+    coverage_path = output_dir / "multi_source_coverage.csv"
     evidence.to_csv(evidence_path, index=False, encoding="utf-8")
     analysis.to_csv(analysis_path, index=False, encoding="utf-8")
-    confirmed.to_csv(confirmed_path, index=False, encoding="utf-8")
+    multi_source_strong.to_csv(strong_path, index=False, encoding="utf-8")
+    multi_source_coverage.to_csv(coverage_path, index=False, encoding="utf-8")
     write_summary(
         output_dir / "summary.md",
         analysis,
         source_status,
+        method_references,
         evidence_rows=len(evidence),
     )
 
@@ -323,7 +368,7 @@ def main(argv: list[str] | None = None) -> int:
         "as_of_date_quality": date_quality,
         "parameters": {
             "days": args.days,
-            "scope": "complete_current_lists",
+            "scope": "complete_provider_responses",
             "plate_request_timeout": args.plate_request_timeout,
             "plate_max_retries": args.plate_max_retries,
             "akshare_max_retries": args.akshare_max_retries,
@@ -331,25 +376,30 @@ def main(argv: list[str] | None = None) -> int:
         },
         "fork_commits": commits,
         "source_status": source_status,
+        "method_references": method_references,
         "records": {
             "direction_evidence": len(evidence),
             "direction_analysis": len(analysis),
-            "confirmed_directions": len(confirmed),
+            "multi_source_strong": len(multi_source_strong),
+            "multi_source_coverage": len(multi_source_coverage),
         },
         "files": files,
         "method_notes": [
             "a-stock-data is retained as a pinned interface reference because its implementation is embedded in SKILL.md.",
             "AKShare supplies the structured Eastmoney board snapshot at runtime.",
-            "Cross-source validation counts independent source families, not duplicate provider outputs.",
-            "Raw percentage returns and strength scores are never combined; only within-source rank positions are averaged.",
-            "Every parseable row in each current source list is normalized and analyzed without a Top-N cutoff.",
+            "Multi-source coverage counts independent source families, not duplicate provider outputs.",
+            "Multi-source strength requires at least two independent families to satisfy source-specific rules.",
+            "THS and Kaipan responses are upstream-selected current Top10 lists; no wider anonymous reusable endpoint is currently reliable.",
+            "Eastmoney strength means top 20 percent of the returned list with positive change.",
+            "Raw percentage returns and strength scores are never combined or converted to a cross-source rank score.",
+            "Every parseable row returned by each current interface is normalized and analyzed without local Top-N truncation.",
             "Only the latest-day plate list is normalized; the upstream historical matrix parser can misalign dates when cells are empty.",
         ],
     }
     write_json(output_dir / "manifest.json", manifest)
     print(
         f"as_of={as_of_date} evidence={len(evidence)} analysis={len(analysis)} "
-        f"confirmed={len(confirmed)}"
+        f"strong={len(multi_source_strong)} coverage={len(multi_source_coverage)}"
     )
     if evidence.empty:
         print(json.dumps(source_status, ensure_ascii=False, indent=2), file=sys.stderr)

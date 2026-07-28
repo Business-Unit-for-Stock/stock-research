@@ -106,8 +106,10 @@ class DirectionTests(unittest.TestCase):
         self.assertEqual(kaipan.iloc[0]["metric_unit"], "score")
 
         analysis = build_direction_analysis(pd.concat([ths, kaipan], ignore_index=True))
-        self.assertEqual(analysis.iloc[0]["evidence_level"], "cross_source")
+        self.assertEqual(analysis.iloc[0]["coverage_level"], "multi_source_coverage")
+        self.assertEqual(analysis.iloc[0]["strength_level"], "multi_source_strong")
         self.assertEqual(analysis.iloc[0]["evidence_count"], 2)
+        self.assertEqual(analysis.iloc[0]["strong_source_count"], 2)
         self.assertEqual(analysis.iloc[0]["lifecycle"], "multi_source_current")
         self.assertNotIn("metric_value", analysis.columns)
 
@@ -156,8 +158,11 @@ class DirectionTests(unittest.TestCase):
         self.assertEqual(len(plate), 55)
         self.assertEqual(akshare.iloc[-1]["list_size"], 55)
         self.assertEqual(plate.iloc[-1]["list_size"], 55)
-        self.assertAlmostEqual(akshare.iloc[-1]["rank_score"], 1 / 55, places=6)
-        self.assertAlmostEqual(plate.iloc[-1]["rank_score"], 1 / 55, places=6)
+        self.assertNotIn("rank_score", akshare.columns)
+        self.assertFalse(bool(akshare.iloc[-1]["is_strong"]))
+        self.assertTrue(bool(akshare.iloc[10]["is_strong"]))
+        self.assertFalse(bool(akshare.iloc[11]["is_strong"]))
+        self.assertTrue(bool(plate.iloc[-1]["is_strong"]))
 
     def test_same_source_family_only_counts_once(self) -> None:
         common = {
@@ -171,7 +176,8 @@ class DirectionTests(unittest.TestCase):
             "canonical_name": "通信",
             "rank": 1,
             "list_size": 20,
-            "rank_score": 1.0,
+            "is_strong": True,
+            "strength_rule": "top_20pct_and_positive_change",
             "metric": "change_pct",
             "metric_value": 2.0,
             "metric_unit": "pct",
@@ -185,7 +191,55 @@ class DirectionTests(unittest.TestCase):
         rows = [{**common, "universe": "industry"}, {**common, "universe": "concept"}]
         analysis = build_direction_analysis(pd.DataFrame(rows))
         self.assertEqual(analysis.iloc[0]["evidence_count"], 1)
-        self.assertEqual(analysis.iloc[0]["evidence_level"], "single_source")
+        self.assertEqual(analysis.iloc[0]["strong_source_count"], 1)
+        self.assertEqual(analysis.iloc[0]["coverage_level"], "single_source")
+
+    def test_multi_source_coverage_does_not_imply_multi_source_strength(self) -> None:
+        common = {
+            "as_of_date": "2026-07-27",
+            "date_quality": "source_reported",
+            "fetched_at": "now",
+            "code": "BK1",
+            "name": "通信",
+            "canonical_name": "通信",
+            "list_size": 100,
+            "metric": "change_pct",
+            "metric_value": 1.0,
+            "metric_unit": "pct",
+            "color": "",
+            "leader": "",
+            "up_count": None,
+            "down_count": None,
+            "raw_file": "raw.json",
+            "source_commit": "abc",
+        }
+        rows = [
+            {
+                **common,
+                "provider": "plate-rotation-skill",
+                "source_family": "kaipan",
+                "universe": "plate",
+                "rank": 1,
+                "is_strong": True,
+                "strength_rule": "upstream_selected_current_list",
+            },
+            {
+                **common,
+                "provider": "akshare",
+                "source_family": "eastmoney",
+                "universe": "industry",
+                "rank": 80,
+                "is_strong": False,
+                "strength_rule": "top_20pct_and_positive_change",
+            },
+        ]
+
+        analysis = build_direction_analysis(pd.DataFrame(rows))
+
+        self.assertEqual(analysis.iloc[0]["coverage_level"], "multi_source_coverage")
+        self.assertEqual(analysis.iloc[0]["strength_level"], "single_source_strong")
+        self.assertEqual(analysis.iloc[0]["strong_source_families"], "kaipan")
+        self.assertNotIn("consensus_rank_score", analysis.columns)
 
     def test_direction_script_end_to_end_with_reused_modules(self) -> None:
         project_root = Path(__file__).resolve().parents[1]
@@ -273,16 +327,21 @@ def stock_board_concept_name_em():
                 check=False,
             )
             self.assertEqual(completed.returncode, 0, completed.stderr)
-            confirmed = pd.read_csv(output / "confirmed_directions.csv")
-            self.assertEqual(confirmed.iloc[0]["canonical_name"], "通信")
-            self.assertEqual(confirmed.iloc[0]["evidence_count"], 3)
+            strong = pd.read_csv(output / "multi_source_strong.csv")
+            coverage = pd.read_csv(output / "multi_source_coverage.csv")
+            self.assertEqual(strong.iloc[0]["canonical_name"], "通信")
+            self.assertEqual(strong.iloc[0]["strong_source_count"], 3)
+            self.assertEqual(coverage.iloc[0]["evidence_count"], 3)
             manifest = json.loads((output / "manifest.json").read_text(encoding="utf-8"))
-            self.assertEqual(manifest["records"]["confirmed_directions"], 1)
+            self.assertEqual(manifest["records"]["multi_source_strong"], 1)
+            self.assertEqual(manifest["records"]["multi_source_coverage"], 1)
             self.assertEqual(manifest["source_status"]["akshare_industry"]["attempts"], 2)
-            self.assertEqual(manifest["parameters"]["scope"], "complete_current_lists")
+            self.assertNotIn("a_stock_data_reference", manifest["source_status"])
+            self.assertFalse(manifest["method_references"]["a_stock_data"]["runtime_requests"])
+            self.assertEqual(manifest["parameters"]["scope"], "complete_provider_responses")
             summary = (output / "summary.md").read_text(encoding="utf-8")
             self.assertIn("完整方向证据：4", summary)
-            self.assertIn("无 Top-N 截断", summary)
+            self.assertIn("本地无 Top-N 截断", summary)
 
 
 if __name__ == "__main__":
