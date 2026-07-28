@@ -6,6 +6,7 @@ import importlib.util
 import json
 import subprocess
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -45,6 +46,8 @@ def parser() -> argparse.ArgumentParser:
     command.add_argument("--plate-timeout", type=int, default=45)
     command.add_argument("--plate-request-timeout", type=int, default=15)
     command.add_argument("--plate-max-retries", type=int, default=1)
+    command.add_argument("--akshare-max-retries", type=int, default=2)
+    command.add_argument("--akshare-retry-delay", type=float, default=2.0)
     command.add_argument("--skip-akshare", action="store_true", help="only collect plate data")
     return command
 
@@ -68,6 +71,18 @@ def write_json(path: Path, payload: object) -> None:
 
 def dataframe_records(frame: pd.DataFrame) -> list[dict]:
     return json.loads(frame.to_json(orient="records", force_ascii=False, date_format="iso"))
+
+
+def fetch_akshare_frame(loader, *, max_retries: int, retry_delay: float):
+    attempts = max(0, max_retries) + 1
+    for attempt in range(1, attempts + 1):
+        try:
+            return loader(), attempt
+        except Exception:  # noqa: BLE001
+            if attempt >= attempts:
+                raise
+            time.sleep(max(0.0, retry_delay) * (2 ** (attempt - 1)))
+    raise RuntimeError("AKShare retry loop ended unexpectedly")
 
 
 def load_plate_parsers(plate_repo: Path):
@@ -240,7 +255,11 @@ def main(argv: list[str] | None = None) -> int:
                 status_key = f"akshare_{universe}"
                 raw_path = raw_dir / f"akshare_{universe}.json"
                 try:
-                    raw_frame = loader()
+                    raw_frame, attempts = fetch_akshare_frame(
+                        loader,
+                        max_retries=args.akshare_max_retries,
+                        retry_delay=args.akshare_retry_delay,
+                    )
                     records = dataframe_records(raw_frame)
                     write_json(raw_path, records)
                     frame = normalize_akshare_boards(
@@ -256,7 +275,12 @@ def main(argv: list[str] | None = None) -> int:
                     if frame.empty:
                         raise RuntimeError("标准化后没有板块记录")
                     frames.append(frame)
-                    source_status[status_key] = {"ok": True, "rows": len(frame), "raw_file": raw_path.name}
+                    source_status[status_key] = {
+                        "ok": True,
+                        "rows": len(frame),
+                        "attempts": attempts,
+                        "raw_file": raw_path.name,
+                    }
                 except Exception as exc:  # noqa: BLE001
                     source_status[status_key] = {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
 
@@ -287,6 +311,8 @@ def main(argv: list[str] | None = None) -> int:
             "top_n": args.top_n,
             "plate_request_timeout": args.plate_request_timeout,
             "plate_max_retries": args.plate_max_retries,
+            "akshare_max_retries": args.akshare_max_retries,
+            "akshare_retry_delay": args.akshare_retry_delay,
         },
         "fork_commits": commits,
         "source_status": source_status,

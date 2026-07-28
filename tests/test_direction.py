@@ -179,6 +179,8 @@ def parse_plate_rotat(payload, source='ths'):
             (package / "__init__.py").write_text(
                 """import pandas as pd
 
+_industry_attempts = 0
+
 def _frame():
     return pd.DataFrame([{
         '排名': 1, '板块名称': '通信行业', '板块代码': 'BK0448',
@@ -186,6 +188,10 @@ def _frame():
     }])
 
 def stock_board_industry_name_em():
+    global _industry_attempts
+    _industry_attempts += 1
+    if _industry_attempts == 1:
+        raise ConnectionError('transient test failure')
     return _frame()
 
 def stock_board_concept_name_em():
@@ -214,6 +220,8 @@ def stock_board_concept_name_em():
                     "20",
                     "--top-n",
                     "10",
+                    "--akshare-retry-delay",
+                    "0",
                 ],
                 capture_output=True,
                 text=True,
@@ -227,6 +235,7 @@ def stock_board_concept_name_em():
             self.assertEqual(confirmed.iloc[0]["evidence_count"], 3)
             manifest = json.loads((output / "manifest.json").read_text(encoding="utf-8"))
             self.assertEqual(manifest["records"]["confirmed_directions"], 1)
+            self.assertEqual(manifest["source_status"]["akshare_industry"]["attempts"], 2)
 
 
 if __name__ == "__main__":
