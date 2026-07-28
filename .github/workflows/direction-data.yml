@@ -7,10 +7,6 @@ on:
         required: false
         default: 20
         type: number
-      top_n:
-        required: false
-        default: 20
-        type: number
   workflow_dispatch:
     inputs:
       days:
@@ -19,12 +15,6 @@ on:
         default: "20"
         type: choice
         options: ["10", "20", "30", "50"]
-      top_n:
-        description: "每个来源保留的前 N 个方向"
-        required: false
-        default: "20"
-        type: choice
-        options: ["10", "20", "30"]
   schedule:
     - cron: "35 10 * * 1-5"
 
@@ -74,15 +64,13 @@ jobs:
       - name: Fetch and normalize direction data
         env:
           DAYS: ${{ inputs.days || 20 }}
-          TOP_N: ${{ inputs.top_n || 20 }}
         run: |
           python scripts/fetch_direction_data.py \
             --output-dir data/direction \
             --plate-repo .external/plate-rotation-skill \
             --akshare-repo .external/akshare \
             --a-stock-data-repo .external/a-stock-data \
-            --days "$DAYS" \
-            --top-n "$TOP_N"
+            --days "$DAYS"
       - name: Publish run summary
         if: always() && hashFiles('data/direction/summary.md') != ''
         run: cat data/direction/summary.md >> "$GITHUB_STEP_SUMMARY"

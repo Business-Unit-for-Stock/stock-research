@@ -97,6 +97,15 @@ def _rank_score(rank: int, list_size: int) -> float:
     return round(max(0.0, min(1.0, (list_size - rank + 1) / list_size)), 6)
 
 
+def _finalize_ranks(rows: list[dict[str, Any]]) -> None:
+    if not rows:
+        return
+    list_size = max(len(rows), max(int(row["rank"]) for row in rows))
+    for row in rows:
+        row["list_size"] = list_size
+        row["rank_score"] = _rank_score(int(row["rank"]), list_size)
+
+
 def normalize_akshare_boards(
     records: list[dict[str, Any]],
     *,
@@ -106,14 +115,11 @@ def normalize_akshare_boards(
     fetched_at: str,
     source_commit: str,
     raw_file: str,
-    top_n: int,
 ) -> pd.DataFrame:
-    """Normalize AKShare's Eastmoney industry/concept ranking snapshot."""
+    """Normalize every AKShare Eastmoney industry/concept ranking row."""
     normalized: list[dict[str, Any]] = []
     for index, record in enumerate(records, start=1):
         rank = _integer(_first(record, "排名", "rank"), index) or index
-        if rank > top_n:
-            continue
         name = str(_first(record, "板块名称", "name", default="")).strip()
         if not name:
             continue
@@ -130,8 +136,6 @@ def normalize_akshare_boards(
                 "name": name,
                 "canonical_name": canonical_direction_name(name),
                 "rank": rank,
-                "list_size": top_n,
-                "rank_score": _rank_score(rank, top_n),
                 "metric": "change_pct",
                 "metric_value": change_pct,
                 "metric_unit": "pct",
@@ -143,6 +147,7 @@ def normalize_akshare_boards(
                 "source_commit": source_commit,
             }
         )
+    _finalize_ranks(normalized)
     return pd.DataFrame(normalized, columns=DIRECTION_COLUMNS)
 
 
@@ -154,19 +159,18 @@ def normalize_plate_rotation(
     fetched_at: str,
     source_commit: str,
     raw_file: str,
-    top_n: int,
 ) -> pd.DataFrame:
-    """Normalize the verified latest-day plate list and preserve source units."""
+    """Normalize the complete verified latest-day list and preserve source units."""
     dates = parser_module.parse_plate_rotat_dates(payload)
     normalized: list[dict[str, Any]] = []
     metric = "change_pct" if source == "ths" else "strength_score"
     unit = "pct" if source == "ths" else "score"
     if not dates:
         return pd.DataFrame(columns=DIRECTION_COLUMNS)
-    for record in parser_module.parse_plate_rotat(payload, source=source)[:top_n]:
+    for record in parser_module.parse_plate_rotat(payload, source=source):
         rank = _integer(record.get("rank"))
         name = str(record.get("name") or "").strip()
-        if rank is None or not name:
+        if rank is None or rank <= 0 or not name:
             continue
         normalized.append(
             {
@@ -180,8 +184,6 @@ def normalize_plate_rotation(
                 "name": name,
                 "canonical_name": canonical_direction_name(name),
                 "rank": rank,
-                "list_size": top_n,
-                "rank_score": _rank_score(rank, top_n),
                 "metric": metric,
                 "metric_value": _number(record.get("value")),
                 "metric_unit": unit,
@@ -193,6 +195,7 @@ def normalize_plate_rotation(
                 "source_commit": source_commit,
             }
         )
+    _finalize_ranks(normalized)
     return pd.DataFrame(normalized, columns=DIRECTION_COLUMNS)
 
 

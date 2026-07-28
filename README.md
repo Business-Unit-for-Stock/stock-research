@@ -63,8 +63,8 @@ GitHub Actions 中的 `Free market data snapshot` 会在工作日北京时间 18
 ## 方向数据
 
 `Direction data snapshot` 复用组织的 `plate-rotation-skill` 与 AKShare Fork，生成原始
-板块响应、统一证据表和多源一致性结果。它只比较各来源内部的排名位置，不混合涨幅与
-强度分，也不产生买卖结论。详见[方向数据 Workflow](docs/direction-data.md)。
+板块响应、无 Top-N 截断的统一证据表和多源一致性结果。它只比较各来源内部的排名
+位置，不混合涨幅与强度分，也不产生买卖结论。详见[方向数据 Workflow](docs/direction-data.md)。
 
 ## 数据格式
 

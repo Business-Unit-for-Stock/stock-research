@@ -7,7 +7,7 @@ Artifact。
 ## 复用关系
 
 - `plate-rotation-skill`：直接调用其 `fetch.py` 和 `parsers.py`，获取同花顺涨幅榜和
-  开盘啦强度榜；完整原始响应保留在 Artifact，标准化阶段只采用最新交易日 Top 榜；
+  开盘啦强度榜；完整原始响应保留在 Artifact，标准化阶段采用最新交易日完整榜单；
 - `akshare`：直接安装组织 Fork，获取东方财富的行业和概念板块结构化快照；
 - `a-stock-data`：当前代码只存在于 `SKILL.md`，不是可导入包。Workflow 固定并记录
   该 Fork 的提交，作为东财行业排名和板块资金流接口的方法来源；运行时使用 AKShare
@@ -39,6 +39,8 @@ Artifact。
    常识补齐。
 5. AKShare 的东财行业与概念接口遇到临时连接错误时默认短退避重试两次；重试耗尽后
    保留该来源失败状态，其他成功来源仍正常产出。
+6. 当前榜单不设置 Top-N 截断。AKShare 返回的全部行业和概念、板块轮动接口返回的
+   全部当前记录均进入证据表和分析；`rank_score` 按各自实际榜单长度计算。
 
 ## 手动运行
 
@@ -51,8 +53,7 @@ python scripts/fetch_direction_data.py `
   --plate-repo ..\plate-rotation-skill `
   --akshare-repo ..\akshare `
   --a-stock-data-repo ..\a-stock-data `
-  --days 20 `
-  --top-n 20
+  --days 20
 ```
 
 运行失败时仍会尽量写出 `manifest.json`、`summary.md` 和各成功来源的原始文件，便于

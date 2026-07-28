@@ -42,7 +42,6 @@ def parser() -> argparse.ArgumentParser:
         help="a-stock-data checkout path; records the pinned interface reference",
     )
     command.add_argument("--days", type=int, default=20, choices=[10, 20, 30, 50])
-    command.add_argument("--top-n", type=int, default=20, choices=range(5, 51))
     command.add_argument("--plate-timeout", type=int, default=45)
     command.add_argument("--plate-request-timeout", type=int, default=15)
     command.add_argument("--plate-max-retries", type=int, default=1)
@@ -143,9 +142,22 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def write_summary(path: Path, analysis: pd.DataFrame, source_status: dict[str, dict]) -> None:
+def write_summary(
+    path: Path,
+    analysis: pd.DataFrame,
+    source_status: dict[str, dict],
+    *,
+    evidence_rows: int,
+) -> None:
     confirmed = analysis[analysis["evidence_level"] == "cross_source"].head(10)
-    lines = ["# 方向数据运行摘要", "", f"- 当前方向候选：{len(analysis)}", ""]
+    lines = [
+        "# 方向数据运行摘要",
+        "",
+        f"- 完整方向证据：{evidence_rows}",
+        f"- 聚合方向候选：{len(analysis)}",
+        "- 当前榜单范围：完整（无 Top-N 截断）",
+        "",
+    ]
     lines.append("## 数据源状态")
     for name, status in source_status.items():
         state = "ok" if status.get("ok") else "failed"
@@ -226,7 +238,6 @@ def main(argv: list[str] | None = None) -> int:
                     fetched_at=fetched_at,
                     source_commit=commits["plate_rotation_skill"] or "unknown",
                     raw_file=str(raw_path.relative_to(output_dir)).replace("\\", "/"),
-                    top_n=args.top_n,
                 )
                 if frame.empty:
                     raise RuntimeError("解析后没有板块记录")
@@ -270,7 +281,6 @@ def main(argv: list[str] | None = None) -> int:
                         fetched_at=fetched_at,
                         source_commit=commits["akshare"] or "unknown",
                         raw_file=str(raw_path.relative_to(output_dir)).replace("\\", "/"),
-                        top_n=args.top_n,
                     )
                     if frame.empty:
                         raise RuntimeError("标准化后没有板块记录")
@@ -293,7 +303,12 @@ def main(argv: list[str] | None = None) -> int:
     evidence.to_csv(evidence_path, index=False, encoding="utf-8")
     analysis.to_csv(analysis_path, index=False, encoding="utf-8")
     confirmed.to_csv(confirmed_path, index=False, encoding="utf-8")
-    write_summary(output_dir / "summary.md", analysis, source_status)
+    write_summary(
+        output_dir / "summary.md",
+        analysis,
+        source_status,
+        evidence_rows=len(evidence),
+    )
 
     files = {}
     for path in sorted(output_dir.rglob("*")):
@@ -308,7 +323,7 @@ def main(argv: list[str] | None = None) -> int:
         "as_of_date_quality": date_quality,
         "parameters": {
             "days": args.days,
-            "top_n": args.top_n,
+            "scope": "complete_current_lists",
             "plate_request_timeout": args.plate_request_timeout,
             "plate_max_retries": args.plate_max_retries,
             "akshare_max_retries": args.akshare_max_retries,
@@ -327,6 +342,7 @@ def main(argv: list[str] | None = None) -> int:
             "AKShare supplies the structured Eastmoney board snapshot at runtime.",
             "Cross-source validation counts independent source families, not duplicate provider outputs.",
             "Raw percentage returns and strength scores are never combined; only within-source rank positions are averaged.",
+            "Every parseable row in each current source list is normalized and analyzed without a Top-N cutoff.",
             "Only the latest-day plate list is normalized; the upstream historical matrix parser can misalign dates when cells are empty.",
         ],
     }

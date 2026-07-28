@@ -55,7 +55,6 @@ class DirectionTests(unittest.TestCase):
             fetched_at="now",
             source_commit="abc",
             raw_file="raw/industry.json",
-            top_n=20,
         )
         self.assertEqual(frame.iloc[0]["source_family"], "eastmoney")
         self.assertEqual(frame.iloc[0]["canonical_name"], "通信")
@@ -82,7 +81,6 @@ class DirectionTests(unittest.TestCase):
             fetched_at="now",
             source_commit="plate",
             raw_file="raw/ths.json",
-            top_n=20,
         )
         kaipan = normalize_plate_rotation(
             {
@@ -103,7 +101,6 @@ class DirectionTests(unittest.TestCase):
             fetched_at="now",
             source_commit="plate",
             raw_file="raw/kaipan.json",
-            top_n=20,
         )
         self.assertEqual(ths.iloc[0]["metric_unit"], "pct")
         self.assertEqual(kaipan.iloc[0]["metric_unit"], "score")
@@ -113,6 +110,54 @@ class DirectionTests(unittest.TestCase):
         self.assertEqual(analysis.iloc[0]["evidence_count"], 2)
         self.assertEqual(analysis.iloc[0]["lifecycle"], "multi_source_current")
         self.assertNotIn("metric_value", analysis.columns)
+
+    def test_normalizers_keep_complete_lists_and_use_actual_size(self) -> None:
+        akshare_records = [
+            {
+                "排名": rank,
+                "板块名称": f"方向{rank}",
+                "板块代码": f"BK{rank:04d}",
+                "涨跌幅": 1.0,
+            }
+            for rank in range(1, 56)
+        ]
+        akshare = normalize_akshare_boards(
+            akshare_records,
+            universe="concept",
+            as_of_date="2026-07-27",
+            date_quality="retrieval_date",
+            fetched_at="now",
+            source_commit="akshare",
+            raw_file="raw/concept.json",
+        )
+        plate = normalize_plate_rotation(
+            {
+                "dates": ["2026-07-27"],
+                "matrix": [],
+                "today": [
+                    {
+                        "rank": rank,
+                        "code": f"{rank:06d}",
+                        "name": f"板块{rank}",
+                        "value": f"{rank}%",
+                        "color": "red",
+                    }
+                    for rank in range(1, 56)
+                ],
+            },
+            source="ths",
+            parser_module=_PlateParsers,
+            fetched_at="now",
+            source_commit="plate",
+            raw_file="raw/ths.json",
+        )
+
+        self.assertEqual(len(akshare), 55)
+        self.assertEqual(len(plate), 55)
+        self.assertEqual(akshare.iloc[-1]["list_size"], 55)
+        self.assertEqual(plate.iloc[-1]["list_size"], 55)
+        self.assertAlmostEqual(akshare.iloc[-1]["rank_score"], 1 / 55, places=6)
+        self.assertAlmostEqual(plate.iloc[-1]["rank_score"], 1 / 55, places=6)
 
     def test_same_source_family_only_counts_once(self) -> None:
         common = {
@@ -218,8 +263,6 @@ def stock_board_concept_name_em():
                     str(a_stock_data_repo),
                     "--days",
                     "20",
-                    "--top-n",
-                    "10",
                     "--akshare-retry-delay",
                     "0",
                 ],
@@ -236,6 +279,10 @@ def stock_board_concept_name_em():
             manifest = json.loads((output / "manifest.json").read_text(encoding="utf-8"))
             self.assertEqual(manifest["records"]["confirmed_directions"], 1)
             self.assertEqual(manifest["source_status"]["akshare_industry"]["attempts"], 2)
+            self.assertEqual(manifest["parameters"]["scope"], "complete_current_lists")
+            summary = (output / "summary.md").read_text(encoding="utf-8")
+            self.assertIn("完整方向证据：4", summary)
+            self.assertIn("无 Top-N 截断", summary)
 
 
 if __name__ == "__main__":
