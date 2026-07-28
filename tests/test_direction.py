@@ -294,6 +294,11 @@ def stock_board_industry_name_em():
     return _frame()
 
 def stock_board_concept_name_em():
+    return fetch_paginated_data('https://17.push2.eastmoney.com/api/qt/clist/get', {})
+
+def fetch_paginated_data(url, params):
+    if 'push2delay.eastmoney.com' not in url:
+        raise ConnectionError('default Eastmoney host unavailable')
     return _frame()
 """,
                 encoding="utf-8",
@@ -336,6 +341,10 @@ def stock_board_concept_name_em():
             self.assertEqual(manifest["records"]["multi_source_strong"], 1)
             self.assertEqual(manifest["records"]["multi_source_coverage"], 1)
             self.assertEqual(manifest["source_status"]["akshare_industry"]["attempts"], 2)
+            self.assertEqual(
+                manifest["source_status"]["akshare_concept"]["request_mode"],
+                "eastmoney_delay_host_fallback",
+            )
             self.assertNotIn("a_stock_data_reference", manifest["source_status"])
             self.assertFalse(manifest["method_references"]["a_stock_data"]["runtime_requests"])
             self.assertEqual(manifest["parameters"]["scope"], "complete_provider_responses")

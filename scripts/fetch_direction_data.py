@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib
 import importlib.util
 import json
 import subprocess
@@ -9,6 +10,7 @@ import sys
 import time
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import urlsplit, urlunsplit
 from zoneinfo import ZoneInfo
 
 import pandas as pd
@@ -82,6 +84,29 @@ def fetch_akshare_frame(loader, *, max_retries: int, retry_delay: float):
                 raise
             time.sleep(max(0.0, retry_delay) * (2 ** (attempt - 1)))
     raise RuntimeError("AKShare retry loop ended unexpectedly")
+
+
+def load_akshare_with_delay_host(loader):
+    """Reuse the AKShare loader while switching only Eastmoney's request host."""
+    module = importlib.import_module(loader.__module__)
+    original = getattr(module, "fetch_paginated_data", None)
+    if original is None:
+        raise RuntimeError(f"{loader.__module__} does not expose fetch_paginated_data")
+
+    def fetch_from_delay_host(url, *args, **kwargs):
+        parsed = urlsplit(url)
+        hostname = parsed.hostname or ""
+        if hostname == "push2.eastmoney.com" or hostname.endswith(".push2.eastmoney.com"):
+            url = urlunsplit(
+                (parsed.scheme, "push2delay.eastmoney.com", parsed.path, parsed.query, parsed.fragment)
+            )
+        return original(url, *args, **kwargs)
+
+    module.fetch_paginated_data = fetch_from_delay_host
+    try:
+        return loader()
+    finally:
+        module.fetch_paginated_data = original
 
 
 def load_plate_parsers(plate_repo: Path):
@@ -304,11 +329,27 @@ def main(argv: list[str] | None = None) -> int:
                 status_key = f"akshare_{universe}"
                 raw_path = raw_dir / f"akshare_{universe}.json"
                 try:
-                    raw_frame, attempts = fetch_akshare_frame(
-                        loader,
-                        max_retries=args.akshare_max_retries,
-                        retry_delay=args.akshare_retry_delay,
-                    )
+                    request_mode = "akshare_default_host"
+                    try:
+                        raw_frame, attempts = fetch_akshare_frame(
+                            loader,
+                            max_retries=args.akshare_max_retries,
+                            retry_delay=args.akshare_retry_delay,
+                        )
+                    except Exception as primary_exc:  # noqa: BLE001
+                        try:
+                            raw_frame, fallback_attempts = fetch_akshare_frame(
+                                lambda: load_akshare_with_delay_host(loader),
+                                max_retries=args.akshare_max_retries,
+                                retry_delay=args.akshare_retry_delay,
+                            )
+                        except Exception as fallback_exc:  # noqa: BLE001
+                            raise RuntimeError(
+                                f"default host failed: {type(primary_exc).__name__}: {primary_exc}; "
+                                f"delay host failed: {type(fallback_exc).__name__}: {fallback_exc}"
+                            ) from fallback_exc
+                        attempts = args.akshare_max_retries + 1 + fallback_attempts
+                        request_mode = "eastmoney_delay_host_fallback"
                     records = dataframe_records(raw_frame)
                     write_json(raw_path, records)
                     frame = normalize_akshare_boards(
@@ -327,6 +368,7 @@ def main(argv: list[str] | None = None) -> int:
                         "ok": True,
                         "rows": len(frame),
                         "attempts": attempts,
+                        "request_mode": request_mode,
                         "scope": "complete_returned_list",
                         "raw_file": raw_path.name,
                     }
@@ -387,6 +429,7 @@ def main(argv: list[str] | None = None) -> int:
         "method_notes": [
             "a-stock-data is retained as a pinned interface reference because its implementation is embedded in SKILL.md.",
             "AKShare supplies the structured Eastmoney board snapshot at runtime.",
+            "If Eastmoney's default push2 host fails, the same AKShare loader is retried against the official push2delay host.",
             "Multi-source coverage counts independent source families, not duplicate provider outputs.",
             "Multi-source strength requires at least two independent families to satisfy source-specific rules.",
             "THS and Kaipan responses are upstream-selected current Top10 lists; no wider anonymous reusable endpoint is currently reliable.",
