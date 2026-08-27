@@ -9,6 +9,7 @@ venv/
 dist/
 build/
 outputs*/
+artifacts/
 data/raw/
 data/processed/
 data/snapshot*/
