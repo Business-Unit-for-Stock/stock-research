@@ -22,6 +22,11 @@ on:
         required: false
         default: "akshare,baostock"
         type: string
+      publish_results:
+        description: "是否将本次报告发布到私有 qmt-results（需 Environment 审批）"
+        required: true
+        default: false
+        type: boolean
   schedule:
     - cron: "20 11 * * 1-5"
 
@@ -96,3 +101,54 @@ jobs:
             backtest-bars.csv
           if-no-files-found: warn
           retention-days: 30
+
+  publish:
+    needs: backtest
+    if: ${{ inputs.publish_results == true }}
+    runs-on: ubuntu-latest
+    environment:
+      name: results-publish
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    env:
+      RESULTS_REPO: Business-Unit-for-Stock/qmt-results
+    steps:
+      - name: Download current report artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: backtest-${{ github.run_id }}
+          path: artifact
+      - name: Checkout private results repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.RESULTS_REPO }}
+          token: ${{ secrets.RESULTS_TOKEN }}
+          path: qmt-results
+          persist-credentials: true
+      - name: Publish report and audit files
+        shell: bash
+        run: |
+          set -euo pipefail
+          month="$(date -u +%Y/%m)"
+          run_dir="run-${GITHUB_RUN_ID}"
+          report_dir="qmt-results/reports/${month}/${run_dir}"
+          audit_dir="qmt-results/audits/${month}/${run_dir}"
+          mkdir -p "$report_dir" "$audit_dir"
+          cp artifact/outputs/report.md artifact/outputs/summary.json artifact/outputs/equity_curve.csv artifact/outputs/signals.csv "$report_dir/"
+          cp artifact/outputs/trades.csv "$audit_dir/"
+          if [[ -f artifact/data/snapshot/manifest.json ]]; then cp artifact/data/snapshot/manifest.json "$audit_dir/"; fi
+          cat > "$audit_dir/run-metadata.json" <<EOF
+          {
+            "source_repository": "${GITHUB_REPOSITORY}",
+            "source_run_id": "${GITHUB_RUN_ID}",
+            "source_sha": "${GITHUB_SHA}",
+            "published_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          }
+          EOF
+          cd qmt-results
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add reports audits
+          git commit -m "report: publish backtest run ${GITHUB_RUN_ID}" || echo "No changes to commit"
+          git push origin HEAD:main

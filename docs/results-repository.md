@@ -25,6 +25,8 @@
 
 ## 后续跨仓库发布
 
-待你在 GitHub 网页创建私有 `qmt-results` 后，再增加最小权限的专用发布凭据和发布
-步骤。发布凭据只授予该结果仓库写权限，并仅在受保护分支或人工审批后的 Workflow
-中使用；不在不可信 Pull Request 中注入。
+当前已创建私有 `Business-Unit-for-Stock/qmt-results`。在 `stock-research` 的
+`results-publish` Environment 中配置一个只允许写入该结果仓库的 `RESULTS_TOKEN`；
+不要把它配置为普通仓库 Secret，也不要在不可信 Pull Request 中注入。运行
+`Backtest report` 时只有明确勾选 `publish_results=true` 并通过 Environment 审批，才会
+执行跨仓库发布。
