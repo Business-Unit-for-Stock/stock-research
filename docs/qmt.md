@@ -25,8 +25,8 @@ Token 或 `.env` 文件；QMT 客户端登录状态和会话目录只留在本�
 
 ## Environment Secrets
 
-在 GitHub 仓库的 `Settings -> Environments` 创建 `qmt-paper`，配置必需审批者；只在
-该 Environment 中配置下列 Secret 名称，实际值由你自行填写，不要提交到代码仓库：
+仓库已创建 `qmt-paper` Environment，并配置 `PeterKZhao` 为必需审批者。只在该
+Environment 中配置下列 Secret 名称，实际值由你自行填写，不要提交到代码仓库：
 
 | Secret | 用途 |
 |---|---|

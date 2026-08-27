@@ -25,8 +25,13 @@
 
 ## 后续跨仓库发布
 
-当前已创建私有 `Business-Unit-for-Stock/qmt-results`。在 `stock-research` 的
-`results-publish` Environment 中配置一个只允许写入该结果仓库的 `RESULTS_TOKEN`；
+当前已创建私有 `Business-Unit-for-Stock/qmt-results`，并在 `stock-research` 创建了
+由 `PeterKZhao` 审批的 `results-publish` Environment。在其中配置一个只允许写入该
+结果仓库的 `RESULTS_TOKEN`；
 不要把它配置为普通仓库 Secret，也不要在不可信 Pull Request 中注入。运行
 `Backtest report` 时只有明确勾选 `publish_results=true` 并通过 Environment 审批，才会
 执行跨仓库发布。
+
+`RESULTS_TOKEN` 可以使用免费的 fine-grained personal access token，仅授权
+`qmt-results` 的 `Contents: Read and write`；不需要把 token 值发送给助手，也不需要
+授予其他仓库或 Actions 管理权限。
