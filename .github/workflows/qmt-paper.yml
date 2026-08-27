@@ -1,0 +1,106 @@
+name: QMT paper execution
+
+on:
+  workflow_dispatch:
+    inputs:
+      trades_path:
+        description: "Runner 本地已审核 trades.csv 的路径（runner-file 模式使用）"
+        required: true
+        default: "C:\\qmt-approved\\trades.csv"
+        type: string
+      source:
+        description: "订单来源：Runner 外部文件或已完成回测 Artifact"
+        required: true
+        default: runner-file
+        type: choice
+        options: [runner-file, backtest-artifact]
+      backtest_run_id:
+        description: "backtest-artifact 模式的回测 Run ID"
+        required: false
+        default: ""
+        type: string
+      execution:
+        description: "默认 dry-run；paper-submit 仅用于已审批的模拟盘"
+        required: true
+        default: dry-run
+        type: choice
+        options: [dry-run, paper-submit]
+      confirmation:
+        description: "paper-submit 必须填写 PAPER-ONLY-APPROVED"
+        required: true
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: qmt-paper
+  cancel-in-progress: false
+
+jobs:
+  execute:
+    runs-on: [self-hosted, windows, qmt]
+    environment:
+      name: qmt-paper
+    timeout-minutes: 15
+    env:
+      QMT_ACCOUNT_ID: ${{ secrets.QMT_ACCOUNT_ID }}
+      QMT_SESSION_PATH: ${{ secrets.QMT_SESSION_PATH }}
+      QMT_SESSION_ID: ${{ secrets.QMT_SESSION_ID }}
+      QMT_MODE: paper
+      PAPER_ONLY: "true"
+      QMT_RUNNER_CONFIRMED: ${{ secrets.QMT_RUNNER_CONFIRMED }}
+      QMT_APPROVED: ${{ secrets.QMT_APPROVED }}
+      RUNNER_ENVIRONMENT: self-hosted
+    steps:
+      - name: Checkout research code
+        uses: actions/checkout@v4
+      - name: Download reviewed backtest artifact
+        if: ${{ inputs.source == 'backtest-artifact' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: backtest-${{ inputs.backtest_run_id }}
+          path: qmt-input
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.backtest_run_id }}
+      - name: Verify QMT runner and input
+        shell: pwsh
+        env:
+          TRADES_PATH: ${{ inputs.trades_path }}
+          SOURCE: ${{ inputs.source }}
+          BACKTEST_RUN_ID: ${{ inputs.backtest_run_id }}
+          EXECUTION: ${{ inputs.execution }}
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:RUNNER_ENVIRONMENT -ne 'self-hosted') { throw '必须使用 self-hosted Runner' }
+          if ($env:EXECUTION -eq 'paper-submit' -and $env:CONFIRMATION -ne 'PAPER-ONLY-APPROVED') { throw 'paper-submit 确认文本不匹配' }
+          if ($env:SOURCE -eq 'backtest-artifact') {
+            if ($env:BACKTEST_RUN_ID -notmatch '^\d+$') { throw 'backtest-artifact 模式必须提供数字 Run ID' }
+            $path = [IO.Path]::GetFullPath('qmt-input/outputs/trades.csv', (Get-Location).Path)
+          } else {
+            $path = [IO.Path]::GetFullPath($env:TRADES_PATH, (Get-Location).Path)
+          }
+          if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "找不到 trades.csv: $path" }
+          "QMT_TRADES_PATH=$path" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Output "已找到订单输入: $path"
+      - name: Dry-run or submit paper orders
+        shell: pwsh
+        env:
+          EXECUTION: ${{ inputs.execution }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $args = @('--trades', $env:QMT_TRADES_PATH, '--output', 'outputs/qmt-orders.json')
+          if ($env:EXECUTION -eq 'paper-submit') { $args += '--submit' }
+          python scripts/run_qmt.py @args
+      - name: Upload QMT order audit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qmt-paper-${{ github.run_id }}
+          path: outputs/qmt-orders.json
+          if-no-files-found: warn
+          retention-days: 30

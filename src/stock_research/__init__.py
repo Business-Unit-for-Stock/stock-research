@@ -3,6 +3,7 @@
 from .backtest import BacktestConfig, BacktestResult, run_backtest
 from .data import DataValidationError, load_bars_csv, normalize_symbol, prepare_bars
 from .factors import momentum, moving_average_gap, top_n_equal_weight
+from .qmt import QMTConfig, QMTConfigurationError, QMTExecutor, OrderIntent
 from .rules import FeeSchedule, MarketRules
 
 __all__ = [
@@ -11,6 +12,10 @@ __all__ = [
     "DataValidationError",
     "FeeSchedule",
     "MarketRules",
+    "OrderIntent",
+    "QMTConfig",
+    "QMTConfigurationError",
+    "QMTExecutor",
     "load_bars_csv",
     "momentum",
     "moving_average_gap",
@@ -19,4 +24,3 @@ __all__ = [
     "run_backtest",
     "top_n_equal_weight",
 ]
-

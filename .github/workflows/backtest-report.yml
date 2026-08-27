@@ -1,0 +1,98 @@
+name: Backtest report
+
+on:
+  workflow_dispatch:
+    inputs:
+      data_mode:
+        description: "回测输入：离线样例或免费公开行情"
+        required: true
+        default: sample
+        type: choice
+        options: [sample, free]
+      start_date:
+        description: "免费行情开始日期 YYYYMMDD；样例模式忽略"
+        required: false
+        type: string
+      end_date:
+        description: "免费行情结束日期 YYYYMMDD；样例模式忽略"
+        required: false
+        type: string
+      providers:
+        description: "免费数据源，逗号分隔"
+        required: false
+        default: "akshare,baostock"
+        type: string
+  schedule:
+    - cron: "20 11 * * 1-5"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backtest-report
+  cancel-in-progress: false
+
+jobs:
+  backtest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      DATA_MODE: ${{ inputs.data_mode || 'free' }}
+      START_DATE: ${{ inputs.start_date }}
+      END_DATE: ${{ inputs.end_date }}
+      PROVIDERS: ${{ inputs.providers || 'akshare,baostock' }}
+    steps:
+      - name: Checkout research code
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install research and free-data dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[data]"
+      - name: Select backtest input
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$DATA_MODE" == "sample" ]]; then
+            cp examples/data/sample_bars.csv backtest-bars.csv
+          else
+            args=(--symbols config/symbols-smoke.txt --providers "$PROVIDERS" --output-dir data/snapshot)
+            if [[ -n "$START_DATE" ]]; then args+=(--start-date "$START_DATE"); fi
+            if [[ -n "$END_DATE" ]]; then args+=(--end-date "$END_DATE"); fi
+            python scripts/fetch_free_data.py "${args[@]}"
+            for candidate in data/snapshot/akshare_daily.csv data/snapshot/baostock_daily.csv data/snapshot/yfinance_daily.csv; do
+              if [[ -s "$candidate" ]]; then cp "$candidate" backtest-bars.csv; break; fi
+            done
+            test -s backtest-bars.csv
+          fi
+          python - <<'PY'
+          import pandas as pd
+          frame = pd.read_csv("backtest-bars.csv")
+          required = {"date", "symbol", "open", "high", "low", "close", "volume"}
+          missing = required - set(frame.columns)
+          if missing:
+              raise SystemExit(f"回测输入缺少字段: {sorted(missing)}")
+          print(f"bars={len(frame)} symbols={frame['symbol'].nunique()}")
+          PY
+      - name: Run rule-aware backtest
+        run: python -m stock_research.cli --bars backtest-bars.csv --lookback 3 --top-n 1 --output outputs
+      - name: Build Markdown report
+        run: python scripts/build_report.py --input outputs --output outputs/report.md
+      - name: Publish summary
+        if: always() && hashFiles('outputs/report.md') != ''
+        run: cat outputs/report.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload research artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backtest-${{ github.run_id }}
+          path: |
+            outputs
+            data/snapshot/manifest.json
+            backtest-bars.csv
+          if-no-files-found: warn
+          retention-days: 30

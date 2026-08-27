@@ -12,6 +12,10 @@ outputs*/
 data/raw/
 data/processed/
 data/snapshot*/
+qmt-session/
+qmt-session*/
+qmt-logs/
+*.xtlog
 *.parquet
 *.duckdb
 .env
