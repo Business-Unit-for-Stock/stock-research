@@ -9,6 +9,8 @@ import pandas as pd
 from stock_research.qmt import (
     QMTConfig,
     QMTConfigurationError,
+    QMTDataClient,
+    QMTDataError,
     QMTExecutor,
     OrderIntent,
     intents_from_trade_frame,
@@ -16,6 +18,67 @@ from stock_research.qmt import (
 
 
 class QMTTests(unittest.TestCase):
+    def test_qmt_data_client_normalizes_symbol_oriented_response(self) -> None:
+        class FakeXTData:
+            def __init__(self):
+                self.downloads = []
+
+            def download_history_data(self, symbol, **kwargs):
+                self.downloads.append((symbol, kwargs))
+
+            def get_market_data_ex(self, fields, symbols, **kwargs):
+                self.request = (fields, symbols, kwargs)
+                return {
+                    "600519.SH": pd.DataFrame(
+                        {
+                            "time": [20260102, 20260105],
+                            "open": [10.0, 10.5],
+                            "high": [10.4, 10.8],
+                            "low": [9.8, 10.2],
+                            "close": [10.2, 10.7],
+                            "volume": [1000, 1200],
+                            "amount": [10200, 12840],
+                        }
+                    )
+                }
+
+        fake = FakeXTData()
+        result = QMTDataClient(fake).fetch_history(
+            ["600519"], "2026-01-01", "2026-01-31"
+        )
+        self.assertEqual(result.iloc[0]["date"].strftime("%Y-%m-%d"), "2026-01-02")
+        self.assertEqual(result.iloc[0]["symbol"], "600519.XSHG")
+        self.assertEqual(result.iloc[1]["close"], 10.7)
+        self.assertEqual(fake.downloads[0][0], "600519.SH")
+
+    def test_qmt_data_client_accepts_field_oriented_response(self) -> None:
+        class FakeXTData:
+            def get_market_data_ex(self, fields, symbols, **kwargs):
+                index = pd.Index([20260102], name="time")
+                return {
+                    "open": pd.DataFrame({"000001.SZ": [10.0]}, index=index),
+                    "high": pd.DataFrame({"000001.SZ": [11.0]}, index=index),
+                    "low": pd.DataFrame({"000001.SZ": [9.0]}, index=index),
+                    "close": pd.DataFrame({"000001.SZ": [10.5]}, index=index),
+                    "volume": pd.DataFrame({"000001.SZ": [100]}, index=index),
+                }
+
+        result = QMTDataClient(FakeXTData()).fetch_history(
+            ["000001.XSHE"], "20260101", "20260131"
+        )
+        self.assertEqual(result.iloc[0]["symbol"], "000001.XSHE")
+        self.assertEqual(result.iloc[0]["volume"], 100)
+
+    def test_qmt_data_client_rejects_empty_response(self) -> None:
+        class FakeXTData:
+            def get_market_data_ex(self, fields, symbols, **kwargs):
+                return {}
+
+        with self.assertRaises(QMTDataError):
+            QMTDataClient(FakeXTData()).fetch_history(
+                ["600519"], "20260101", "20260131"
+            )
+
     def test_dry_run_does_not_require_credentials(self) -> None:
         executor = QMTExecutor(QMTConfig("", "", dry_run=True))
         result = executor.submit([OrderIntent("600519", "buy", 100, 10.0)])

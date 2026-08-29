@@ -20,7 +20,8 @@
 - 净值、回撤、波动率、夏普率、换手和交易流水；
 - 完整的离线样例及标准库单元测试。
 - 调用组织 AKShare/yfinance Fork 的免费数据 Workflow，结果以 Artifact 保存。
-- 可选 QMT 模拟盘适配层，默认 dry-run；需 Windows 自托管 Runner 和人工审批，见 [QMT 运行说明](docs/qmt.md)。
+- 以 QMT `xtdata` 为首选行情源进行分析，QMT 不可用时可审计地回退公共数据；另有默认 dry-run 的 QMT 模拟盘适配层，需 Windows 自托管 Runner 和人工审批，见 [QMT 运行说明](docs/qmt.md)。
+- `QMT-first market analysis` Workflow 在 QMT Windows 自托管 Runner 上执行行情、因子和回测，结果 Artifact 会记录实际数据来源。
 - 可接入私有 Obsidian 行业知识库，导出行业/企业结构化上下文，见 [行业知识库接入](docs/industry-integration.md)。
 
 外部能力的职责、许可证和接入方式见

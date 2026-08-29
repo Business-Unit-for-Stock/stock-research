@@ -1,12 +1,41 @@
-# QMT 模拟盘运行
+# QMT 行情分析与模拟盘运行
 
-本仓库的 QMT 集成是可选适配层，研究和回测不依赖 QMT 或 `xtquant`。默认行为是
-`dry-run`：读取已审核的 `trades.csv`，校验证券代码、数量、价格和日期后，只生成
-订单审计 JSON，不连接券商。
+QMT 是本体系的首选行情来源。`xtdata` 读取历史行情用于因子、回测和报告；如果 QMT
+行情服务不可用，只有选择 `qmt-first` 时才会按顺序回退到公共数据，并在
+`market-manifest.json` 记录原因。订单部分仍默认是 `dry-run`，读取已审核的
+`trades.csv` 后只生成订单审计 JSON，不连接券商。
+
+## QMT 行情分析
+
+QMT 客户端需要在 Windows 自托管 Runner 上运行，并提供本地 `xtdata` 服务。启动 QMT
+并完成客户端登录后，可以在仓库根目录执行：
+
+```powershell
+python -m pip install -e ".[data]"
+python scripts/fetch_market_data.py `
+  --symbols config\symbols.txt `
+  --start-date 20250101 `
+  --end-date 20251231 `
+  --source qmt
+python -m stock_research.cli `
+  --bars data\market\market_daily.csv `
+  --lookback 20 `
+  --top-n 5 `
+  --output outputs
+```
+
+`--source qmt` 在 QMT 不可用时直接失败，适合验证数据链路；`--source qmt-first` 才允许
+回退公共数据。每次输出的 `data/market/market-manifest.json` 会标记 `source_used`，不要
+把回退结果误认为 QMT 数据。
+
+GitHub Actions 中的 `QMT-first market analysis` 只运行在
+`[self-hosted, windows, qmt]` Runner。该 Workflow 不读取证券密码，QMT 行情服务使用
+本机客户端会话；若选择 `qmt-first`，Runner 还需要安装可选的公共数据依赖。
 
 ## 运行边界
 
 - 当前只支持股票账户（`STOCK`）。
+- QMT 行情读取是只读操作，不使用交易账户，也不提交订单。
 - 订单数量必须是正数且为 100 股整数倍。
 - `qmt-paper.yml` 只允许 `paper` 模式；本仓库不会从 GitHub Actions 提交实盘订单。
 - 只有 Windows 自托管 Runner 标签 `[self-hosted, windows, qmt]` 才能执行该 Workflow。

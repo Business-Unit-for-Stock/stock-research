@@ -8,9 +8,9 @@ actually submitted on a Windows QMT host.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 import math
-from typing import Any, Iterable
+from typing import Any, Iterable, Mapping
 
 import pandas as pd
 
@@ -19,6 +19,10 @@ from .data import normalize_symbol
 
 class QMTConfigurationError(ValueError):
     """Raised when an execution request is not safe or complete."""
+
+
+class QMTDataError(ValueError):
+    """Raised when the local QMT market-data service cannot provide valid data."""
 
 
 @dataclass(frozen=True)
@@ -99,6 +103,16 @@ def _load_xtquant() -> Any:
     return xtconstant, xttrader
 
 
+def _load_xtdata() -> Any:
+    try:
+        from xtquant import xtdata  # type: ignore
+    except ImportError as exc:  # pragma: no cover - requires QMT host
+        raise QMTDataError(
+            "当前 Python 环境未安装 QMT xtdata，请在 QMT Windows 主机上运行"
+        ) from exc
+    return xtdata
+
+
 def _parse_signal_date(value: Any) -> date | None:
     """Parse pandas/date/string values while treating CSV nulls as missing."""
     if value is None:
@@ -132,6 +146,206 @@ def _normalize_qmt_symbol(value: Any) -> str:
     code, exchange = canonical.split(".", 1)
     suffix = {"XSHG": "SH", "XSHE": "SZ", "XBSE": "BJ"}[exchange]
     return f"{code}.{suffix}"
+
+
+def _qmt_date(value: str, name: str) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    parsed = pd.to_datetime(text, errors="coerce")
+    if pd.isna(parsed):
+        raise QMTDataError(f"{name} 不是有效日期: {value!r}")
+    return parsed.strftime("%Y%m%d")
+
+
+def _qmt_datetime_values(values: Any) -> pd.Series:
+    series = pd.Series(values)
+    numeric = pd.to_numeric(series, errors="coerce")
+    if numeric.notna().all() and not numeric.empty:
+        magnitude = float(numeric.abs().median())
+        if 1e7 <= magnitude < 1e8:
+            return pd.to_datetime(
+                series.astype("Int64").astype(str), format="%Y%m%d", errors="coerce"
+            )
+        if 1e13 <= magnitude < 1e15:
+            return pd.to_datetime(
+                series.astype("Int64").astype(str), format="%Y%m%d%H%M%S", errors="coerce"
+            )
+        unit = "ns" if magnitude >= 1e17 else "ms" if magnitude >= 1e11 else "s"
+        return pd.to_datetime(numeric, unit=unit, errors="coerce").dt.tz_localize(None)
+    return pd.to_datetime(series, errors="coerce").dt.tz_localize(None)
+
+
+def _qmt_response_frames(response: Any, symbols: list[str]) -> list[tuple[str, pd.DataFrame]]:
+    """Accept the symbol-oriented and field-oriented xtdata response shapes."""
+    if isinstance(response, pd.DataFrame):
+        if len(symbols) != 1:
+            raise QMTDataError("QMT 返回单个 DataFrame，但请求了多个证券")
+        return [(symbols[0], response)]
+    if not isinstance(response, Mapping):
+        raise QMTDataError(f"QMT 行情返回类型不支持: {type(response).__name__}")
+
+    frames: list[tuple[str, pd.DataFrame]] = []
+    symbol_keys = {symbol.upper(): symbol for symbol in symbols}
+    for key, value in response.items():
+        if str(key).upper() in symbol_keys and isinstance(value, pd.DataFrame):
+            frames.append((symbol_keys[str(key).upper()], value))
+    if frames:
+        return frames
+
+    # Older xtdata builds return {field: DataFrame(index=time, columns=symbol)}.
+    field_frames = {
+        str(field): value for field, value in response.items() if isinstance(value, pd.DataFrame)
+    }
+    for symbol in symbols:
+        columns: dict[str, Any] = {}
+        for field, frame in field_frames.items():
+            candidates = {str(column).upper(): column for column in frame.columns}
+            column = candidates.get(symbol.upper())
+            if column is not None:
+                columns[field] = frame[column]
+        if columns:
+            frames.append((symbol, pd.DataFrame(columns)))
+    return frames
+
+
+def _normalize_qmt_frame(
+    frame: pd.DataFrame, symbol: str, fetched_at: str, dividend_type: str
+) -> pd.DataFrame:
+    data = frame.copy()
+    if data.empty:
+        return pd.DataFrame()
+    lower_columns = {str(column).strip().lower(): column for column in data.columns}
+    date_column = next(
+        (lower_columns[name] for name in ("date", "datetime", "time") if name in lower_columns),
+        None,
+    )
+    if date_column is None:
+        data["date"] = _qmt_datetime_values(pd.Series(data.index, index=data.index))
+    else:
+        data["date"] = _qmt_datetime_values(data[date_column])
+    data = data.drop(columns=[date_column], errors="ignore")
+    aliases = {
+        "open": ("open",),
+        "high": ("high",),
+        "low": ("low",),
+        "close": ("close",),
+        "volume": ("volume", "vol"),
+        "amount": ("amount", "turnover"),
+        "adj_close": ("adj_close", "close"),
+    }
+    renamed: dict[str, Any] = {}
+    for canonical, candidates in aliases.items():
+        for candidate in candidates:
+            if candidate in lower_columns:
+                renamed[canonical] = data[lower_columns[candidate]]
+                break
+    normalized = pd.DataFrame(renamed)
+    normalized["date"] = data["date"]
+    missing = {"open", "high", "low", "close", "volume"} - set(normalized.columns)
+    if missing:
+        raise QMTDataError(f"QMT 返回数据缺少字段: {sorted(missing)} ({symbol})")
+    normalized["adj_close"] = normalized.get("adj_close", normalized["close"])
+    normalized["amount"] = normalized.get("amount", pd.NA)
+    normalized["symbol"] = normalize_symbol(symbol)
+    normalized["provider"] = "qmt"
+    normalized["fetched_at"] = fetched_at
+    normalized["adjust"] = dividend_type
+    normalized = normalized[
+        [
+            "date",
+            "symbol",
+            "open",
+            "high",
+            "low",
+            "close",
+            "adj_close",
+            "volume",
+            "amount",
+            "provider",
+            "fetched_at",
+            "adjust",
+        ]
+    ]
+    for column in ("open", "high", "low", "close", "adj_close", "volume", "amount"):
+        normalized[column] = pd.to_numeric(normalized[column], errors="coerce")
+    return normalized.dropna(subset=["date", "close"]).sort_values("date").reset_index(drop=True)
+
+
+class QMTDataClient:
+    """Read historical bars from the local QMT/xtdata service.
+
+    This client is read-only: it does not use a trading account and never
+    submits orders.  QMT must be installed and its local data service running.
+    """
+
+    def __init__(self, xtdata_module: Any | None = None):
+        self._xtdata_module = xtdata_module
+
+    def fetch_history(
+        self,
+        symbols: Iterable[str],
+        start_date: str,
+        end_date: str,
+        *,
+        period: str = "1d",
+        dividend_type: str = "none",
+        count: int = -1,
+        fill_data: bool = True,
+    ) -> pd.DataFrame:
+        normalized_symbols = sorted({_normalize_qmt_symbol(symbol) for symbol in symbols})
+        if not normalized_symbols:
+            raise QMTDataError("QMT 行情请求没有有效证券代码")
+        start = _qmt_date(start_date, "start_date")
+        end = _qmt_date(end_date, "end_date")
+        if start and end and start > end:
+            raise QMTDataError("start_date 不能晚于 end_date")
+        if count == 0 or count < -1:
+            raise QMTDataError("count 必须为 -1 或正整数")
+        if dividend_type not in {"none", "front", "back", "front_ratio", "back_ratio"}:
+            raise QMTDataError(f"不支持的 QMT dividend_type: {dividend_type}")
+
+        xtdata = self._xtdata_module or _load_xtdata()
+        downloader = getattr(xtdata, "download_history_data", None)
+        if not callable(getattr(xtdata, "get_market_data_ex", None)) and not callable(
+            getattr(xtdata, "get_market_data", None)
+        ):
+            raise QMTDataError("当前 QMT xtdata 没有可用的历史行情接口")
+        for symbol in normalized_symbols:
+            if callable(downloader):
+                downloader(
+                    symbol,
+                    period=period,
+                    start_time=start,
+                    end_time=end,
+                    incrementally=True,
+                )
+
+        fields = ["open", "high", "low", "close", "volume", "amount"]
+        getter = getattr(xtdata, "get_market_data_ex", None) or getattr(
+            xtdata, "get_market_data"
+        )
+        response = getter(
+            fields,
+            normalized_symbols,
+            period=period,
+            start_time=start,
+            end_time=end,
+            count=count,
+            dividend_type=dividend_type,
+            fill_data=fill_data,
+        )
+        fetched_at = datetime.now(timezone.utc).isoformat()
+        frames = [
+            _normalize_qmt_frame(frame, symbol, fetched_at, dividend_type)
+            for symbol, frame in _qmt_response_frames(response, normalized_symbols)
+        ]
+        frames = [frame for frame in frames if not frame.empty]
+        if not frames:
+            raise QMTDataError("QMT 行情接口未返回有效数据")
+        return pd.concat(frames, ignore_index=True).sort_values(
+            ["date", "symbol"], kind="stable"
+        ).reset_index(drop=True)
 
 
 class QMTExecutor:

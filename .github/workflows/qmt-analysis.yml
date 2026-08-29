@@ -1,0 +1,94 @@
+name: QMT-first market analysis
+
+on:
+  workflow_dispatch:
+    inputs:
+      start_date:
+        description: "开始日期 YYYYMMDD"
+        required: true
+        type: string
+      end_date:
+        description: "结束日期 YYYYMMDD"
+        required: true
+        type: string
+      source:
+        description: "qmt=仅 QMT；qmt-first=QMT 失败后回退公共数据"
+        required: true
+        default: qmt-first
+        type: choice
+        options: [qmt, qmt-first]
+      public_providers:
+        description: "QMT 失败时的公共数据顺序"
+        required: false
+        default: "akshare,baostock,yfinance"
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qmt-analysis
+  cancel-in-progress: false
+
+jobs:
+  analyze:
+    runs-on: [self-hosted, windows, qmt]
+    timeout-minutes: 30
+    env:
+      START_DATE: ${{ inputs.start_date }}
+      END_DATE: ${{ inputs.end_date }}
+      SOURCE: ${{ inputs.source || 'qmt-first' }}
+      PUBLIC_PROVIDERS: ${{ inputs.public_providers || 'akshare,baostock,yfinance' }}
+    steps:
+      - name: Checkout research code
+        uses: actions/checkout@v4
+      - name: Verify QMT host
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:RUNNER_ENVIRONMENT -ne 'self-hosted') { throw '必须使用 QMT 自托管 Runner' }
+          $qmtProcess = Get-Process -Name 'XtMiniQmt' -ErrorAction SilentlyContinue
+          if (-not $qmtProcess) {
+            Write-Warning '未检测到 XtMiniQmt 进程；xtdata 可能无法连接，请先启动 QMT 客户端'
+          }
+      - name: Install research and fallback dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[data]"
+      - name: Fetch QMT-first bars
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $args = @(
+            'scripts/fetch_market_data.py',
+            '--symbols', 'config/symbols.txt',
+            '--start-date', $env:START_DATE,
+            '--end-date', $env:END_DATE,
+            '--source', $env:SOURCE,
+            '--public-providers', $env:PUBLIC_PROVIDERS,
+            '--output-dir', 'data/market'
+          )
+          python @args
+      - name: Run rule-aware backtest
+        shell: pwsh
+        run: python -m stock_research.cli --bars data/market/market_daily.csv --lookback 20 --top-n 5 --output outputs
+      - name: Build analysis report
+        shell: pwsh
+        run: python scripts/build_report.py --input outputs --output outputs/report.md
+      - name: Publish summary
+        if: always()
+        shell: pwsh
+        run: |
+          if (Test-Path outputs/report.md) { Get-Content outputs/report.md | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8 }
+          if (Test-Path data/market/market-manifest.json) { Get-Content data/market/market-manifest.json | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8 }
+      - name: Upload QMT-first analysis artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qmt-analysis-${{ github.run_id }}
+          path: |
+            data/market
+            outputs
+          if-no-files-found: warn
+          retention-days: 30

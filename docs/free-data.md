@@ -2,6 +2,10 @@
 
 ## 当前策略
 
+公共接口是 QMT 行情的备用来源，不是默认的首选来源。需要 QMT 优先时运行
+`QMT-first market analysis` 或 `scripts/fetch_market_data.py --source qmt-first`；只有
+QMT 不可用时才会进入本页的公共接口流程。
+
 Workflow 只安装并调用公开数据接口：
 
 - AKShare：默认主源，A 股日线；

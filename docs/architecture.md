@@ -19,7 +19,7 @@ stock_research.rules      涨跌停、费用、手数和交易许可
 stock_research.backtest   下一交易日执行及组合记账
 stock_research.metrics    收益、波动、夏普和回撤
 stock_research.cli        端到端离线入口
-stock_research.qmt        可选 QMT paper/dry-run 订单适配层
+stock_research.qmt        QMT xtdata 行情读取与 paper/dry-run 订单适配层
 stock_research.industry   私有行业知识库 Frontmatter 导入与上下文校验
 ```
 
@@ -66,8 +66,8 @@ Raw Parquet（不可变） -> 标准化 Parquet + DuckDB -> 数据质量报告
                           组合风险 -> 模拟盘 -> 实盘
 ```
 
-当前实际执行边界为：GitHub-hosted Runner 负责免费数据、研究、回测和报告 Artifact；
-Windows 自托管 Runner 只负责已审核订单的 QMT dry-run 或 paper 提交。实盘、账户密码和
-券商会话不进入 GitHub-hosted Runner，也不由本仓库自动开启。
+当前实际执行边界为：Windows 自托管 Runner 优先负责 QMT 行情、研究、回测和已审核订单的
+dry-run/paper；QMT 行情不可用且明确选择 `qmt-first` 时，才使用公共数据回退。实盘、账户
+密码和券商会话不进入 GitHub-hosted Runner，也不由本仓库自动开启。
 
 达到多人协作规模后，可以拆分为 `stock-data`、`stock-research`、`stock-backtest`、`portfolio-risk` 和 `deploy`。拆分前先确保本仓库中的端到端契约稳定。
