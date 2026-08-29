@@ -1,0 +1,64 @@
+name: Industry knowledge sync
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_revision:
+        description: "留空使用 industry-analysis 当前 main；填写 SHA 可复现指定版本"
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: industry-sync
+  cancel-in-progress: false
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    environment:
+      name: industry-sync
+    timeout-minutes: 10
+    env:
+      INDUSTRY_REPO: PeterKZhao/industry-analysis
+    steps:
+      - name: Checkout research code
+        uses: actions/checkout@v4
+      - name: Checkout private industry knowledge base
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.INDUSTRY_REPO }}
+          ref: ${{ inputs.source_revision || 'main' }}
+          token: ${{ secrets.INDUSTRY_KB_TOKEN }}
+          path: .external/industry-analysis
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install industry importer
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[industry]"
+      - name: Export structured industry context
+        shell: bash
+        run: |
+          set -euo pipefail
+          revision="$(git -C .external/industry-analysis rev-parse HEAD)"
+          python scripts/import_industry_kb.py \
+            --kb-root .external/industry-analysis \
+            --output-dir outputs/industry \
+            --source-repository "${INDUSTRY_REPO}" \
+            --source-revision "$revision"
+          cat outputs/industry/industry-manifest.json >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload structured industry artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: industry-context-${{ github.run_id }}
+          path: outputs/industry
+          if-no-files-found: error
+          retention-days: 30

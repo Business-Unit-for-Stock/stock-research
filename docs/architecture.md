@@ -20,6 +20,7 @@ stock_research.backtest   下一交易日执行及组合记账
 stock_research.metrics    收益、波动、夏普和回撤
 stock_research.cli        端到端离线入口
 stock_research.qmt        可选 QMT paper/dry-run 订单适配层
+stock_research.industry   私有行业知识库 Frontmatter 导入与上下文校验
 ```
 
 ## 复用边界

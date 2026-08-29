@@ -21,6 +21,7 @@
 - 完整的离线样例及标准库单元测试。
 - 调用组织 AKShare/yfinance Fork 的免费数据 Workflow，结果以 Artifact 保存。
 - 可选 QMT 模拟盘适配层，默认 dry-run；需 Windows 自托管 Runner 和人工审批，见 [QMT 运行说明](docs/qmt.md)。
+- 可接入私有 Obsidian 行业知识库，导出行业/企业结构化上下文，见 [行业知识库接入](docs/industry-integration.md)。
 
 外部能力的职责、许可证和接入方式见
 [复用仓库清单](docs/reused-repositories.md)。第三方仓库不直接决定研究结论，
