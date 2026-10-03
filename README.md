@@ -63,6 +63,11 @@ GitHub Actions 中的 `Free market data snapshot` 会在工作日北京时间 18
 
 数据不会自动提交到 Git 历史，而是作为保留 30 天的 Workflow Artifact 下载。配置和授权边界见 [免费数据获取说明](docs/free-data.md)。
 
+## 外部研究与市场信息
+
+市场研究、宏观与估值、投资者持仓以及公开财经信息可作为研究参考，见 [外部研究与市场信息资源](docs/external-research-links.md)。
+这些链接用于补充研究和信息核对，不构成投资建议，也不替代本仓库的数据契约和回测逻辑。
+
 ## 方向数据
 
 `Direction data snapshot` 复用组织的 `plate-rotation-skill` 与 AKShare Fork，生成原始
