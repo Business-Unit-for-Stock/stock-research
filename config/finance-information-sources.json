@@ -188,6 +188,26 @@
       "review_status": "pending_review",
       "enabled": false,
       "notes": "Keep market-data adapters separate from article collection and verify terms."
+    },
+    {
+      "id": "x-api-social-signal",
+      "name": "X API social signal discovery",
+      "url": "https://docs.x.com/",
+      "source_type": "social_signal_api",
+      "scope": ["social_signal", "company_posts", "industry_posts", "market_commentary"],
+      "review_status": "pending_review",
+      "enabled": false,
+      "notes": "Preferred X route is the official API through a dedicated client such as Tweepy. Store post IDs and timestamps, classify content as signal rather than fact, and corroborate material claims with primary sources before publication."
+    },
+    {
+      "id": "xiaohongshu-open-platform",
+      "name": "Xiaohongshu open platform",
+      "url": "https://open.xiaohongshu.com/",
+      "source_type": "social_signal_official_platform",
+      "scope": ["social_signal", "consumer_discussion", "industry_discussion"],
+      "review_status": "pending_review",
+      "enabled": false,
+      "notes": "Register only after confirming an authorized capability for the required content scope. Do not treat reverse-engineered endpoints, cookies, signature emulation, or anti-detection behavior as production approval."
     }
   ]
 }

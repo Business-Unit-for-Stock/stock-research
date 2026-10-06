@@ -17,7 +17,7 @@ class ResourceCatalogTests(unittest.TestCase):
     def test_catalog_loads_and_applies_production_gate(self) -> None:
         catalog = load_resource_catalog(self.path)
         self.assertEqual(catalog.snapshot_date.isoformat(), "2026-10-06")
-        self.assertEqual(len(catalog.resources), 27)
+        self.assertEqual(len(catalog.resources), 28)
         self.assertEqual(catalog.resources[0].repository, "akfamily/akshare")
         self.assertEqual(
             [resource.repository for resource in catalog.production_candidates()],
@@ -44,6 +44,14 @@ class ResourceCatalogTests(unittest.TestCase):
         self.assertEqual(
             {source.id for source in sources if source.enabled},
             {"akshare-market-data", "baostock-market-data", "yfinance-market-data"},
+        )
+        social_sources = {source.id for source in sources if source.source_type.startswith("social_signal")}
+        self.assertEqual(
+            social_sources,
+            {"x-api-social-signal", "xiaohongshu-open-platform"},
+        )
+        self.assertTrue(
+            all(not source.enabled for source in sources if source.id in social_sources)
         )
         self.assertTrue(all(source.url.startswith("https://") for source in sources))
 
