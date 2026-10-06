@@ -32,7 +32,7 @@
 ## 金融垂类资源与信息收集
 
 金融信息单独归属于 `Business-Unit-for-Stock`，不直接混入节能或 AI 行业监测。
-资源目录来自用户 GitHub starred 快照（26 个直接金融资源、1 个相邻 AI 基础设施资源），
+资源目录来自用户 GitHub starred 快照（26 个直接金融资源、2 个相邻资源），
 但 starred、star 数量和项目活跃度都不等于生产准入。
 当前采用以下门槛：业务相关性优先；最近 183 天没有有效维护的项目只能作为研究参考；
 生产数据还必须经过许可证、来源稳定性、点时数据和本仓库数据契约检查。
@@ -75,7 +75,7 @@ python -m unittest discover -s tests -v
 
 ## 免费数据
 
-GitHub Actions 中的 `Free market data snapshot` 会在工作日北京时间 18:30 自动运行，也支持手动指定日期、数据源和复权方式。默认调用 AKShare、Baostock 与 yfinance，单个来源失败不会丢失其他来源的结果。
+GitHub Actions 中的 `Free market data snapshot` 会在工作日北京时间 18:30 自动运行，也支持手动指定日期、数据源和复权方式。默认调用 AKShare、Baostock 与 yfinance，单个来源失败不会丢失其他来源的结果；股票与 ETF 使用独立观察池和归档目录。
 
 数据不会自动提交到 Git 历史，而是作为保留 30 天的 Workflow Artifact 下载。配置和授权边界见 [免费数据获取说明](docs/free-data.md)。
 
