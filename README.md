@@ -23,10 +23,26 @@
 - 以 QMT `xtdata` 为首选行情源进行分析，QMT 不可用时可审计地回退公共数据；另有默认 dry-run 的 QMT 模拟盘适配层，需 Windows 自托管 Runner 和人工审批，见 [QMT 运行说明](docs/qmt.md)。
 - `QMT-first market analysis` Workflow 在 QMT Windows 自托管 Runner 上执行行情、因子和回测，结果 Artifact 会记录实际数据来源。
 - 可接入私有 Obsidian 行业知识库，导出行业/企业结构化上下文，见 [行业知识库接入](docs/industry-integration.md)。
+- 维护 GitHub starred 金融资源目录，按业务相关性优先、六个月无有效维护则仅供研究参考的规则管理候选能力，见 [金融资源目录](config/finance-resources.json)。
 
 外部能力的职责、许可证和接入方式见
 [复用仓库清单](docs/reused-repositories.md)。第三方仓库不直接决定研究结论，
 所有输入必须先经过本仓库的数据契约与质量检查。
+
+## 金融垂类资源与信息收集
+
+金融信息单独归属于 `Business-Unit-for-Stock`，不直接混入节能或 AI 行业监测。
+资源目录来自用户 GitHub starred 快照（26 个直接金融资源、2 个相邻资源），
+但 starred、star 数量和项目活跃度都不等于生产准入。
+当前采用以下门槛：业务相关性优先；最近 183 天没有有效维护的项目只能作为研究参考；
+生产数据还必须经过许可证、来源稳定性、点时数据和本仓库数据契约检查。
+
+金融垂类按数据和研究职责拆分为行情与 ETF、交易所及监管披露、上市公司公告与财报、
+宏观官方数据、行业与公司映射、风险事件、量化研究和研究型 AI。第三方项目只提供候选
+适配器或方法参考，所有最终输出由本仓库统一标准化、留痕和质量校验。金融信息源登记见
+[金融信息源清单](config/finance-information-sources.json)。当前已审核的生产适配器是
+AKShare、Baostock 和 yfinance；网页源必须先完成 robots、访问范围、日期证据、授权和数据
+再分发审查，TradingView 等候选源不能直接进入生产。
 
 ## 快速开始
 
@@ -59,7 +75,7 @@ python -m unittest discover -s tests -v
 
 ## 免费数据
 
-GitHub Actions 中的 `Free market data snapshot` 会在工作日北京时间 18:30 自动运行，也支持手动指定日期、数据源和复权方式。默认调用 AKShare、Baostock 与 yfinance，单个来源失败不会丢失其他来源的结果。
+GitHub Actions 中的 `Free market data snapshot` 会在工作日北京时间 18:30 自动运行，也支持手动指定日期、数据源和复权方式。默认调用 AKShare、Baostock 与 yfinance，单个来源失败不会丢失其他来源的结果；股票与 ETF 使用独立观察池和归档目录。
 
 数据不会自动提交到 Git 历史，而是作为保留 30 天的 Workflow Artifact 下载。配置和授权边界见 [免费数据获取说明](docs/free-data.md)。
 

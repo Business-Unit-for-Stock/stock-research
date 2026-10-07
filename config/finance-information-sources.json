@@ -1,0 +1,213 @@
+{
+  "schema_version": 1,
+  "snapshot_date": "2026-10-06",
+  "policy": {
+    "default_enabled": false,
+    "primary_evidence_required": true,
+    "web_sources_require_review": true,
+    "market_data_is_separate_from_news": true,
+    "no_investment_recommendations": true
+  },
+  "sources": [
+    {
+      "id": "akshare-market-data",
+      "name": "Business-Unit-for-Stock AKShare fork",
+      "url": "https://github.com/Business-Unit-for-Stock/akshare",
+      "source_type": "market_data_adapter",
+      "scope": ["cn_stocks", "etf", "macro", "fundamentals"],
+      "review_status": "approved_existing",
+      "enabled": true,
+      "notes": "Existing adapter. Every result still passes the stock-research data contract."
+    },
+    {
+      "id": "baostock-market-data",
+      "name": "Baostock public market data",
+      "url": "https://github.com/baostock/baostock",
+      "source_type": "market_data_adapter",
+      "scope": ["cn_stocks", "fundamentals"],
+      "review_status": "approved_existing",
+      "enabled": true,
+      "notes": "Existing fallback provider; source dates and missing fields remain explicit."
+    },
+    {
+      "id": "yfinance-market-data",
+      "name": "Business-Unit-for-Stock yfinance fork",
+      "url": "https://github.com/Business-Unit-for-Stock/yfinance",
+      "source_type": "market_data_adapter",
+      "scope": ["us_stocks", "global_etf"],
+      "review_status": "approved_existing",
+      "enabled": true,
+      "notes": "Overseas-market supplement, not the primary A-share source."
+    },
+    {
+      "id": "sse-disclosures",
+      "name": "Shanghai Stock Exchange disclosures",
+      "url": "https://www.sse.com.cn/disclosure/listedinfo/announcement/",
+      "source_type": "official_disclosure",
+      "scope": ["cn_stocks", "company_announcements"],
+      "review_status": "pending_review",
+      "enabled": false,
+      "notes": "Requires robots, date evidence, pagination and attachment-link review."
+    },
+    {
+      "id": "szse-disclosures",
+      "name": "Shenzhen Stock Exchange disclosures",
+      "url": "https://www.szse.cn/disclosure/listed/notice/index.html",
+      "source_type": "official_disclosure",
+      "scope": ["cn_stocks", "company_announcements"],
+      "review_status": "pending_review",
+      "enabled": false,
+      "notes": "Requires robots, date evidence, pagination and attachment-link review."
+    },
+    {
+      "id": "cninfo-disclosures",
+      "name": "CNINFO listed-company disclosure platform",
+      "url": "https://www.cninfo.com.cn/new/index",
+      "source_type": "official_disclosure_aggregator",
+      "scope": ["cn_stocks", "company_announcements", "financial_reports"],
+      "review_status": "pending_review",
+      "enabled": false,
+      "notes": "Use for discovery and evidence links only after access and redistribution review."
+    },
+    {
+      "id": "csrc-regulation",
+      "name": "China Securities Regulatory Commission",
+      "url": "https://www.csrc.gov.cn/",
+      "source_type": "regulatory_source",
+      "scope": ["regulation", "market_policy"],
+      "review_status": "pending_review",
+      "enabled": false,
+      "notes": "Official policy and regulatory facts."
+    },
+    {
+      "id": "bse-disclosures",
+      "name": "Beijing Stock Exchange",
+      "url": "https://www.bse.cn/",
+      "source_type": "official_disclosure",
+      "scope": ["cn_stocks", "company_announcements"],
+      "review_status": "pending_review",
+      "enabled": false,
+      "notes": "Separate market scope from Shanghai and Shenzhen sources."
+    },
+    {
+      "id": "hkex-news",
+      "name": "Hong Kong Exchanges and Clearing",
+      "url": "https://www.hkex.com.hk/News",
+      "source_type": "official_disclosure",
+      "scope": ["hk_stocks", "company_announcements"],
+      "review_status": "pending_review",
+      "enabled": false,
+      "notes": "Overseas source; preserve English and Chinese date evidence separately."
+    },
+    {
+      "id": "sec-edgar",
+      "name": "SEC EDGAR",
+      "url": "https://www.sec.gov/edgar/search-and-access",
+      "source_type": "official_disclosure",
+      "scope": ["us_stocks", "financial_reports", "company_announcements"],
+      "review_status": "pending_review",
+      "enabled": false,
+      "notes": "Use official filings as primary evidence for US companies."
+    },
+    {
+      "id": "stats-china",
+      "name": "National Bureau of Statistics of China",
+      "url": "https://www.stats.gov.cn/",
+      "source_type": "official_macro",
+      "scope": ["macro", "industry_statistics"],
+      "review_status": "pending_review",
+      "enabled": false,
+      "notes": "Macro and industry statistics; preserve publication date and revision status."
+    },
+    {
+      "id": "pbc-statistics",
+      "name": "People's Bank of China",
+      "url": "https://www.pbc.gov.cn/",
+      "source_type": "official_macro",
+      "scope": ["macro", "rates", "liquidity"],
+      "review_status": "pending_review",
+      "enabled": false,
+      "notes": "Policy and monetary statistics; do not infer market impact without evidence."
+    },
+    {
+      "id": "fred",
+      "name": "Federal Reserve Bank of St. Louis FRED",
+      "url": "https://fred.stlouisfed.org/",
+      "source_type": "official_macro_data",
+      "scope": ["us_macro", "rates", "liquidity"],
+      "review_status": "pending_review",
+      "enabled": false,
+      "notes": "Record series ID, observation date and revision metadata."
+    },
+    {
+      "id": "federal-reserve",
+      "name": "US Federal Reserve",
+      "url": "https://www.federalreserve.gov/data.htm",
+      "source_type": "official_macro",
+      "scope": ["us_macro", "rates", "policy"],
+      "review_status": "pending_review",
+      "enabled": false,
+      "notes": "Primary policy statements and official data."
+    },
+    {
+      "id": "eia",
+      "name": "US Energy Information Administration",
+      "url": "https://www.eia.gov/",
+      "source_type": "official_macro",
+      "scope": ["energy", "commodities", "us_macro"],
+      "review_status": "pending_review",
+      "enabled": false,
+      "notes": "Cross-domain energy and commodity data for financial analysis."
+    },
+    {
+      "id": "cls-news",
+      "name": "CLS professional financial news",
+      "url": "https://www.cls.cn/",
+      "source_type": "professional_media",
+      "scope": ["cn_market_news", "company_news"],
+      "review_status": "pending_review",
+      "enabled": false,
+      "notes": "Secondary source only; claims require official evidence when material."
+    },
+    {
+      "id": "yicai-news",
+      "name": "Yicai professional financial news",
+      "url": "https://www.yicai.com/",
+      "source_type": "professional_media",
+      "scope": ["cn_market_news", "macro_news"],
+      "review_status": "pending_review",
+      "enabled": false,
+      "notes": "Secondary discovery source; do not use as the only evidence for company facts."
+    },
+    {
+      "id": "eastmoney-news",
+      "name": "Eastmoney market information",
+      "url": "https://www.eastmoney.com/",
+      "source_type": "professional_media_and_market_data",
+      "scope": ["cn_market_news", "etf", "cn_stocks"],
+      "review_status": "pending_review",
+      "enabled": false,
+      "notes": "Keep market-data adapters separate from article collection and verify terms."
+    },
+    {
+      "id": "x-api-social-signal",
+      "name": "X API social signal discovery",
+      "url": "https://docs.x.com/",
+      "source_type": "social_signal_api",
+      "scope": ["social_signal", "company_posts", "industry_posts", "market_commentary"],
+      "review_status": "pending_review",
+      "enabled": false,
+      "notes": "Preferred X route is the official API through a dedicated client such as Tweepy. Store post IDs and timestamps, classify content as signal rather than fact, and corroborate material claims with primary sources before publication."
+    },
+    {
+      "id": "xiaohongshu-open-platform",
+      "name": "Xiaohongshu open platform",
+      "url": "https://open.xiaohongshu.com/",
+      "source_type": "social_signal_official_platform",
+      "scope": ["social_signal", "consumer_discussion", "industry_discussion"],
+      "review_status": "pending_review",
+      "enabled": false,
+      "notes": "Register only after confirming an authorized capability for the required content scope. Do not treat reverse-engineered endpoints, cookies, signature emulation, or anti-detection behavior as production approval."
+    }
+  ]
+}

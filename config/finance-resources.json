@@ -1,0 +1,304 @@
+{
+  "schema_version": 1,
+  "snapshot_date": "2026-10-06",
+  "source": "PeterKZhao GitHub starred repositories",
+  "matching_summary": {
+    "total_starred_repositories": 163,
+    "direct_finance_resources": 26,
+    "adjacent_resources": 2
+  },
+  "production_policy": {
+    "relevance_first": true,
+    "stale_after_days": 183,
+    "stale_projects_are": "research_only",
+    "star_count_is_not_a_production_gate": true,
+    "requires_license_review": true,
+    "requires_data_contract": true,
+    "requires_point_in_time_validation": true
+  },
+  "repositories": [
+    {
+      "repository": "akfamily/akshare",
+      "url": "https://github.com/akfamily/akshare",
+      "domain": "data_source",
+      "capability": "Chinese financial data interface library",
+      "production_role": "primary_candidate",
+      "active_as_of": "2026-09-30",
+      "license": "MIT",
+      "integration": "Use through the Business-Unit-for-Stock AKShare fork and normalize into the stock-research data contract."
+    },
+    {
+      "repository": "ZhuLinsen/daily_stock_analysis",
+      "url": "https://github.com/ZhuLinsen/daily_stock_analysis",
+      "domain": "market_monitoring",
+      "capability": "Multi-market prices, news, dashboards and notifications",
+      "production_role": "adapter_research",
+      "active_as_of": "2026-10-05",
+      "integration": "Reuse source coverage and report ideas; do not treat its narrative as market truth."
+    },
+    {
+      "repository": "TNT-Likely/PanWatch",
+      "url": "https://github.com/TNT-Likely/PanWatch",
+      "domain": "market_monitoring",
+      "capability": "A-share, Hong Kong and US stock monitoring and alerts",
+      "production_role": "adapter_research",
+      "active_as_of": "2026-10-05",
+      "integration": "Evaluate monitoring concepts and source adapters after contract checks."
+    },
+    {
+      "repository": "jundizhou/easy-stock",
+      "url": "https://github.com/jundizhou/easy-stock",
+      "domain": "market_monitoring",
+      "capability": "A-share analysis and AI research workspace",
+      "production_role": "adapter_research",
+      "active_as_of": "2026-10-06",
+      "integration": "Review data and report components; keep research conclusions inside stock-research."
+    },
+    {
+      "repository": "shy3130/tick-stock-panel",
+      "url": "https://github.com/shy3130/tick-stock-panel",
+      "domain": "market_monitoring",
+      "capability": "A-share screening, monitoring and backtesting workspace",
+      "production_role": "adapter_research",
+      "active_as_of": "2026-10-06",
+      "integration": "Review derived metrics and monitoring concepts; do not import the full application."
+    },
+    {
+      "repository": "simonlin1212/TradingAgents-astock",
+      "url": "https://github.com/simonlin1212/TradingAgents-astock",
+      "domain": "research_analysis",
+      "capability": "A-share multi-agent research with event data",
+      "production_role": "research_only",
+      "active_as_of": "2026-09-25",
+      "license": "Apache-2.0",
+      "integration": "Reuse structured data adapters only; LLM output cannot create scores or recommendations."
+    },
+    {
+      "repository": "simonlin1212/vibe-astock",
+      "url": "https://github.com/simonlin1212/vibe-astock",
+      "domain": "market_monitoring",
+      "capability": "A-share short-term review and locally computed sentiment metrics",
+      "production_role": "adapter_research",
+      "active_as_of": "2026-09-25",
+      "integration": "Evaluate deterministic derived metrics separately from the AI narrative; require source and formula evidence."
+    },
+    {
+      "repository": "TauricResearch/TradingAgents",
+      "url": "https://github.com/TauricResearch/TradingAgents",
+      "domain": "research_analysis",
+      "capability": "Multi-agent financial research framework",
+      "production_role": "research_only",
+      "active_as_of": "2026-10-03",
+      "integration": "Reference orchestration patterns only; require deterministic evidence before publication."
+    },
+    {
+      "repository": "liangdabiao/easy_investment_Agent_crewai",
+      "url": "https://github.com/liangdabiao/easy_investment_Agent_crewai",
+      "domain": "research_analysis",
+      "capability": "AKShare and CrewAI A-share analysis",
+      "production_role": "research_only",
+      "active_as_of": "2026-05-07",
+      "integration": "Use as a design reference after checking data freshness and reproducibility."
+    },
+    {
+      "repository": "terancejiang/financial-report-minesweeper",
+      "url": "https://github.com/terancejiang/financial-report-minesweeper",
+      "domain": "financial_filings",
+      "capability": "Financial report risk checklist",
+      "production_role": "research_only",
+      "active_as_of": "2026-04-16",
+      "integration": "Candidate checklist for filing review; conclusions require primary filing evidence."
+    },
+    {
+      "repository": "middletoo/US_Stock_Crash_Monitor",
+      "url": "https://github.com/middletoo/US_Stock_Crash_Monitor",
+      "domain": "risk_monitoring",
+      "capability": "US market crash index monitoring",
+      "production_role": "research_only",
+      "active_as_of": "2026-09-16",
+      "integration": "Evaluate metric definitions and source provenance before any dashboard use."
+    },
+    {
+      "repository": "fadewalk/serenity-stock-choke",
+      "url": "https://github.com/fadewalk/serenity-stock-choke",
+      "domain": "industry_analysis",
+      "capability": "Supply-chain bottleneck screening skill",
+      "production_role": "research_only",
+      "active_as_of": "2026-10-06",
+      "integration": "Use as a hypothesis generator; validate company and supply-chain claims independently."
+    },
+    {
+      "repository": "theBigGavin/marketingdashboard",
+      "url": "https://github.com/theBigGavin/marketingdashboard",
+      "domain": "market_monitoring",
+      "capability": "Cross-market research dashboard",
+      "production_role": "adapter_research",
+      "active_as_of": "2026-09-28",
+      "integration": "Review display and source coverage only; no direct production dependency yet."
+    },
+    {
+      "repository": "starriv/worth-buy-stocks",
+      "url": "https://github.com/starriv/worth-buy-stocks",
+      "domain": "market_monitoring",
+      "capability": "US stock information and event discovery",
+      "production_role": "research_only",
+      "active_as_of": "2026-10-02",
+      "integration": "Review source coverage and event extraction only; do not treat user-generated recommendations as facts."
+    },
+    {
+      "repository": "Mathieu2301/TradingView-API",
+      "url": "https://github.com/Mathieu2301/TradingView-API",
+      "domain": "data_source",
+      "capability": "TradingView market data access",
+      "production_role": "deferred_candidate",
+      "active_as_of": "2026-10-05",
+      "integration": "Requires terms-of-use, stability and redistribution review before use."
+    },
+    {
+      "repository": "ccxt/ccxt",
+      "url": "https://github.com/ccxt/ccxt",
+      "domain": "data_source",
+      "capability": "Unified crypto exchange API",
+      "production_role": "future_candidate",
+      "active_as_of": "2026-10-06",
+      "license": "MIT",
+      "integration": "Separate crypto market scope from securities research; do not mix price universes."
+    },
+    {
+      "repository": "stefan-jansen/machine-learning-for-trading",
+      "url": "https://github.com/stefan-jansen/machine-learning-for-trading",
+      "domain": "research_analysis",
+      "capability": "Machine learning for trading research and data sourcing",
+      "production_role": "research_only",
+      "active_as_of": "2026-10-06",
+      "integration": "Use for experiment design and validation patterns, not as a production data source."
+    },
+    {
+      "repository": "je-suis-tm/quant-trading",
+      "url": "https://github.com/je-suis-tm/quant-trading",
+      "domain": "quant_research",
+      "capability": "Technical and quantitative strategy examples",
+      "production_role": "research_only",
+      "active_as_of": "2026-06-20",
+      "integration": "Candidate research references; every strategy requires point-in-time and out-of-sample tests."
+    },
+    {
+      "repository": "bbfamily/abu",
+      "url": "https://github.com/bbfamily/abu",
+      "domain": "quant_research",
+      "capability": "Quantitative trading framework",
+      "production_role": "stale_research",
+      "active_as_of": "2026-01-24",
+      "integration": "Do not enter production while outside the six-month activity window."
+    },
+    {
+      "repository": "stefan-jansen/zipline-reloaded",
+      "url": "https://github.com/stefan-jansen/zipline-reloaded",
+      "domain": "backtesting",
+      "capability": "Algorithmic trading backtesting library",
+      "production_role": "stale_research",
+      "active_as_of": "2026-01-06",
+      "integration": "Reference only until activity and compatibility are revalidated."
+    },
+    {
+      "repository": "mementum/backtrader",
+      "url": "https://github.com/mementum/backtrader",
+      "domain": "backtesting",
+      "capability": "Python backtesting library",
+      "production_role": "stale_research",
+      "active_as_of": "2024-08-19",
+      "integration": "Historical reference only; not a production dependency under the stale-project rule."
+    },
+    {
+      "repository": "AI4Finance-Foundation/FinGPT",
+      "url": "https://github.com/AI4Finance-Foundation/FinGPT",
+      "domain": "financial_ai",
+      "capability": "Open financial language models",
+      "production_role": "research_only",
+      "active_as_of": "2026-09-23",
+      "integration": "Potential summarization experiment only; no autonomous investment conclusions."
+    },
+    {
+      "repository": "wilsonfreitas/awesome-quant",
+      "url": "https://github.com/wilsonfreitas/awesome-quant",
+      "domain": "resource_index",
+      "capability": "Curated quantitative finance resources",
+      "production_role": "reference_index",
+      "active_as_of": "2026-10-06",
+      "integration": "Use to discover candidates; each candidate needs independent review."
+    },
+    {
+      "repository": "wangzhe3224/awesome-systematic-trading",
+      "url": "https://github.com/wangzhe3224/awesome-systematic-trading",
+      "domain": "resource_index",
+      "capability": "Curated systematic trading resources",
+      "production_role": "reference_index",
+      "active_as_of": "2026-10-05",
+      "integration": "Use to discover candidates; does not grant production approval."
+    },
+    {
+      "repository": "codeman008/Financial_freedom",
+      "url": "https://github.com/codeman008/Financial_freedom",
+      "domain": "research_knowledge",
+      "capability": "Investment and financial learning material",
+      "production_role": "reference_only",
+      "active_as_of": "2026-08-06",
+      "integration": "Knowledge reference only; no executable code or market facts are trusted without verification."
+    },
+    {
+      "repository": "iqiancheng/fastisslow",
+      "url": "https://github.com/iqiancheng/fastisslow",
+      "domain": "research_knowledge",
+      "capability": "Long-term investment philosophy notes",
+      "production_role": "stale_reference",
+      "active_as_of": "2021-02-04",
+      "integration": "Historical reference only."
+    },
+    {
+      "repository": "bojieli/ai-infra-book",
+      "url": "https://github.com/bojieli/ai-infra-book",
+      "domain": "adjacent_industry",
+      "capability": "AI infrastructure quantitative analysis and system design",
+      "production_role": "cross_domain_reference",
+      "active_as_of": "2026-10-01",
+      "integration": "Useful for AI infrastructure industry mapping; not a securities data source."
+    },
+    {
+      "repository": "Panniantong/Agent-Reach",
+      "url": "https://github.com/Panniantong/Agent-Reach",
+      "domain": "social_signal",
+      "capability": "Discovery layer for X, Xiaohongshu and other web channels",
+      "production_role": "adapter_research",
+      "active_as_of": "2026-09-15",
+      "license": "MIT",
+      "integration": "Use for controlled discovery and source prototyping only. Its channel backends may use login sessions or third-party tools; every platform must pass separate terms, authorization, provenance and redistribution review before production use."
+    }
+  ],
+  "official_source_families": [
+    {
+      "id": "cn_exchange_disclosures",
+      "status": "required_candidate",
+      "scope": "Shanghai, Shenzhen and Beijing exchange disclosures, listing and trading notices"
+    },
+    {
+      "id": "cn_regulatory_disclosures",
+      "status": "required_candidate",
+      "scope": "CSRC and official regulatory disclosures"
+    },
+    {
+      "id": "listed_company_ir",
+      "status": "required_candidate",
+      "scope": "Listed-company investor-relations announcements and reports"
+    },
+    {
+      "id": "global_official_filings",
+      "status": "required_candidate",
+      "scope": "SEC EDGAR and other official overseas filing systems"
+    },
+    {
+      "id": "macro_official_statistics",
+      "status": "required_candidate",
+      "scope": "Central banks, statistical agencies and official macroeconomic series"
+    }
+  ]
+}
