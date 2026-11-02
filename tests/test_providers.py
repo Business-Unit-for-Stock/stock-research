@@ -36,6 +36,24 @@ class ProviderTests(unittest.TestCase):
             path.write_text("# comment\n600519\n600519.XSHG\n000001\n", encoding="utf-8")
             self.assertEqual(read_symbols(path), ["000001.XSHE", "600519.XSHG"])
 
+    def test_etf_observation_pool_is_separate_and_normalized(self) -> None:
+        from pathlib import Path
+
+        path = Path(__file__).resolve().parents[1] / "config" / "etf-symbols.txt"
+        symbols = read_symbols(path)
+        self.assertEqual(len(symbols), 6)
+        self.assertEqual(
+            symbols,
+            [
+                "159915.XSHE",
+                "510300.XSHG",
+                "510500.XSHG",
+                "512880.XSHG",
+                "515790.XSHG",
+                "588000.XSHG",
+            ],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

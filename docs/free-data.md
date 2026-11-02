@@ -34,10 +34,12 @@ python scripts/fetch_free_data.py --start-date 20250101 --end-date 20250726
 
 输出目录为 `data/snapshot/`：
 
-- `akshare_daily.csv`；
-- `baostock_daily.csv`；
-- `yfinance_daily.csv`（启用时）；
-- `manifest.json`，记录时间范围、来源、行数和错误。
+- 股票快照：`akshare_daily.csv`、`baostock_daily.csv`、`yfinance_daily.csv` 和 `manifest.json`；
+- ETF 快照：相同文件名，位于 `data/snapshot/etf/`；
+- 每个 manifest 记录时间范围、来源、行数和错误。
+
+ETF 观察池位于 `config/etf-symbols.txt`，当前只用于市场状态、宽基和行业方向观察，
+不生成买卖建议，也不替代个股研究。
 
 每个 AKShare 股票请求在独立子进程中运行，默认 45 秒超时，避免某个免费接口长时间无响应拖死整次 Workflow。失败明细会写入 `manifest.json`。
 

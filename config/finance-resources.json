@@ -5,7 +5,7 @@
   "matching_summary": {
     "total_starred_repositories": 163,
     "direct_finance_resources": 26,
-    "adjacent_resources": 1
+    "adjacent_resources": 2
   },
   "production_policy": {
     "relevance_first": true,
@@ -262,6 +262,16 @@
       "production_role": "cross_domain_reference",
       "active_as_of": "2026-10-01",
       "integration": "Useful for AI infrastructure industry mapping; not a securities data source."
+    },
+    {
+      "repository": "Panniantong/Agent-Reach",
+      "url": "https://github.com/Panniantong/Agent-Reach",
+      "domain": "social_signal",
+      "capability": "Discovery layer for X, Xiaohongshu and other web channels",
+      "production_role": "adapter_research",
+      "active_as_of": "2026-09-15",
+      "license": "MIT",
+      "integration": "Use for controlled discovery and source prototyping only. Its channel backends may use login sessions or third-party tools; every platform must pass separate terms, authorization, provenance and redistribution review before production use."
     }
   ],
   "official_source_families": [

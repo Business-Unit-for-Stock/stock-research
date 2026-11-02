@@ -80,6 +80,19 @@ jobs:
           if [ -n "$END_DATE" ]; then args+=(--end-date "$END_DATE"); fi
           args+=(--adjust "$ADJUST")
           python scripts/fetch_free_data.py "${args[@]}"
+      - name: Fetch optional free ETF snapshot
+        continue-on-error: true
+        env:
+          START_DATE: ${{ inputs.start_date }}
+          END_DATE: ${{ inputs.end_date }}
+          PROVIDERS: ${{ inputs.providers || 'akshare,baostock,yfinance' }}
+          ADJUST: ${{ inputs.adjust || 'none' }}
+        run: |
+          args=(--symbols config/etf-symbols.txt --providers "$PROVIDERS" --output-dir data/snapshot/etf --per-symbol-timeout 45)
+          if [ -n "$START_DATE" ]; then args+=(--start-date "$START_DATE"); fi
+          if [ -n "$END_DATE" ]; then args+=(--end-date "$END_DATE"); fi
+          args+=(--adjust "$ADJUST")
+          python scripts/fetch_free_data.py "${args[@]}"
       - name: Upload snapshot artifact
         if: always()
         uses: actions/upload-artifact@v7
